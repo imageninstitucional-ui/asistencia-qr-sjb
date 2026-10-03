@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#6d1f3b">
-<title>ASISTENCIA-QR SJB · Reconciliación v14.14</title>
+<title>ASISTENCIA-QR SJB · Reconciliación v14.15</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
@@ -25,7 +25,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.14 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.15 · RESTORE TEST</div></header>
 <main>
 <div class="card" id="loginCard">
 <h3>Acceso</h3>
@@ -104,6 +104,7 @@ const state={
  refresh:localStorage.getItem('sjb_refresh')||'',
  expires:Number(localStorage.getItem('sjb_expires')||0),
  role:'',
+ currentDate:'',
  sections:[]
 };
 function saveSession(d){
@@ -137,7 +138,8 @@ function render(r){
  const s=r.status||'yellow';
  $('status').className='tag '+s;
  $('status').textContent=s==='green'?'VERDE · LISTO':s==='red'?'ROJO · BLOQUEADO':'AMARILLO · REVISAR';
- $('dateText').textContent='Fecha: '+(r.attendance_date||'');
+ state.currentDate=r.attendance_date||'';
+ $('dateText').textContent='Fecha: '+state.currentDate;
  $('expected').textContent=r.expected_students??0;
  $('marked').textContent=r.marked_students??0;
  $('unverified').textContent=r.unverified_students??0;
@@ -147,7 +149,10 @@ function render(r){
  $('stale').textContent=r.stale_devices??0;
  $('errors').textContent=(r.device_errors??0)+(r.inconsistencies??0);
  state.role=r.operator_role||'';
- $('operator').textContent='Rol actual: '+(r.operator_role||'operador');
+ $('operator').textContent='Rol actual: '+(r.operator_role||'operador')+
+   (['administrator','reconciler','tutor'].includes(r.operator_role||'')
+     ? ' · validación humana habilitada según alcance'
+     : ' · vista de control sin edición nominal');
  if(s==='green'){
   $('summary').textContent='No se detectan pendientes técnicos ni estudiantes sin verificar.';
   $('closeReason').textContent='Semáforo VERDE. El cierre solo podrá ejecutarlo un reconciliador o administrador autorizado.';
@@ -215,10 +220,48 @@ async function loadDetail(sectionId){
   const r=await rpc('attendance_unverified_students',{p_section_id:sectionId});
   const students=Array.isArray(r.students)?r.students:[];
   $('detailTitle').textContent=(r.level_name||'')+' · '+(r.grade_name||'')+' '+(r.section_name||'');
-  $('detailNote').textContent=students.length+' estudiante(s) pendientes de verificación.';
+  $('detailNote').textContent=students.length+' estudiante(s) pendientes de verificación. Ninguno se considera ausente hasta que una persona autorizada lo confirme.';
   $('detailList').innerHTML=students.length
-    ? students.map(s=>'<div class="detail-row">'+esc(s.student_name)+'</div>').join('')
+    ? students.map(s=>
+      '<div class="detail-row" data-student="'+esc(s.student_id)+'">'+
+        '<b>'+esc(s.student_name)+'</b>'+
+        '<div class="row" style="margin-top:8px">'+
+          '<select class="verifyStatus">'+
+            '<option value="present">Presente sin QR</option>'+
+            '<option value="late">Tardanza</option>'+
+            '<option value="absent_verified">Ausencia verificada</option>'+
+            '<option value="excused">Justificada</option>'+
+          '</select>'+
+          '<input class="verifyNote" placeholder="Observación / sustento (opcional)">'+
+          '<button type="button" class="verifyBtn">GUARDAR</button>'+
+        '</div>'+
+      '</div>'
+     ).join('')
     : '<div class="detail-row">No hay estudiantes pendientes.</div>';
+  document.querySelectorAll('.verifyBtn').forEach(btn=>{
+    btn.onclick=async()=>{
+      const row=btn.closest('.detail-row');
+      const studentId=row.dataset.student;
+      const status=row.querySelector('.verifyStatus').value;
+      const note=row.querySelector('.verifyNote').value.trim();
+      const labels={present:'Presente sin QR',late:'Tardanza',absent_verified:'Ausencia verificada',excused:'Justificada'};
+      if(!confirm('Confirmar: '+labels[status]+' para este estudiante.'))return;
+      try{
+        btn.disabled=true;btn.textContent='GUARDANDO…';
+        const out=await rpc('attendance_verify_student_status',{
+          p_student_id:studentId,
+          p_date:state.currentDate,
+          p_status:status,
+          p_note:note||null
+        });
+        row.innerHTML='<b>'+esc(out.student_name||'Estudiante')+'</b><p class="tag green">VERIFICADO · '+esc(labels[status])+'</p>';
+        setTimeout(async()=>{await load();if(r.section_id)await loadDetail(r.section_id)},450)
+      }catch(e){
+        btn.disabled=false;btn.textContent='GUARDAR';
+        row.insertAdjacentHTML('beforeend','<p class="red tag">ERROR · '+esc(e.message)+'</p>')
+      }
+    }
+  });
   $('detailCard').scrollIntoView({behavior:'smooth',block:'start'})
  }catch(e){
   $('detailNote').textContent=e.message==='DETAIL_ACCESS_DENIED'
