@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6d1f3b">
+<title>ASISTENCIA-QR SJB · Reconciliación</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
+*{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
+main{max-width:900px;margin:auto;padding:14px}.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.metric{flex:1;min-width:160px;background:#f8fafc;border-radius:14px;padding:14px}
+.metric b{font-size:1.55rem;display:block}.tag{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:900}
+.green{background:#dcfce7;color:#166534}.yellow{background:#fef3c7;color:#92400e}.red{background:#fee2e2;color:#991b1b}.muted{color:#64748b}
+button,a.btn{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:#243f68;color:#fff;font-weight:800;text-decoration:none;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{font-size:1.25rem;font-weight:900}
+.notice{border-left:5px solid #f59e0b;padding-left:12px}
+</style>
+</head>
+<body>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · RESTORE TEST</div></header>
+<main>
+<div class="card">
+<div class="row"><span id="status" class="tag yellow">COMPROBANDO…</span><span id="dateText"></span></div>
+<p id="summary" class="muted">Leyendo estado institucional.</p>
+</div>
+
+<div class="card">
+<h3>Estado de la jornada</h3>
+<div class="row">
+ <div class="metric"><span>Esperados</span><b id="expected">—</b></div>
+ <div class="metric"><span>Marcados / verificados</span><b id="marked">—</b></div>
+ <div class="metric"><span>Sin verificar</span><b id="unverified">—</b></div>
+ <div class="metric"><span>Ausencias verificadas</span><b id="absent">—</b></div>
+</div>
+<div class="row">
+ <div class="metric"><span>Eventos pendientes</span><b id="pending">—</b></div>
+ <div class="metric"><span>Dispositivos offline</span><b id="offline">—</b></div>
+ <div class="metric"><span>Dispositivos sin heartbeat</span><b id="stale">—</b></div>
+ <div class="metric"><span>Errores / inconsistencias</span><b id="errors">—</b></div>
+</div>
+</div>
+
+<div class="card">
+<h3>Regla de cierre</h3>
+<p class="notice"><b>VERDE:</b> puede avanzar al cierre. <b>AMARILLO:</b> requiere revisión humana. <b>ROJO:</b> cierre bloqueado por inconsistencia o error crítico.</p>
+<p id="closeReason"></p>
+<div class="row">
+ <button id="refresh">ACTUALIZAR ESTADO</button>
+ <button id="closeBtn" class="danger" disabled>CERRAR ASISTENCIA</button>
+ <a class="btn" href="./">VOLVER AL LECTOR</a>
+</div>
+<p class="muted">En esta etapa piloto el botón de cierre permanece bloqueado hasta que exista semáforo VERDE y un operador con rol de reconciliador/administrador. Ningún estudiante no marcado se convierte automáticamente en ausente.</p>
+</div>
+
+<div class="card">
+<h3>Sesión</h3>
+<p id="operator" class="muted">Comprobando operador…</p>
+<pre id="diag"></pre>
+</div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
+const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
+const $=id=>document.getElementById(id);
+const state={
+ access:localStorage.getItem('sjb_access')||'',
+ refresh:localStorage.getItem('sjb_refresh')||'',
+ expires:Number(localStorage.getItem('sjb_expires')||0)
+};
+function saveSession(d){
+ state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;
+ state.expires=Date.now()+((d.expires_in||3600)*1000);
+ localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))
+}
+async function parse(r){
+ const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}
+ if(!r.ok)throw new Error(d.message||d.msg||d.error_description||d.error||('HTTP '+r.status));return d
+}
+async function refresh(force=false){
+ if(!state.refresh)return false;
+ if(!force&&state.access&&Date.now()<state.expires-60000)return true;
+ try{
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));
+  saveSession(d);return true
+ }catch{return false}
+}
+async function rpc(name,body={}){
+ if(!(await refresh(false)))throw new Error('SESIÓN_REQUERIDA');
+ let r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ if(r.status===401&&await refresh(true))r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ return parse(r)
+}
+function render(r){
+ const s=r.status||'yellow';
+ $('status').className='tag '+s;
+ $('status').textContent=s==='green'?'VERDE · LISTO':s==='red'?'ROJO · BLOQUEADO':'AMARILLO · REVISAR';
+ $('dateText').textContent='Fecha: '+(r.attendance_date||'');
+ $('expected').textContent=r.expected_students??0;
+ $('marked').textContent=r.marked_students??0;
+ $('unverified').textContent=r.unverified_students??0;
+ $('absent').textContent=r.verified_absences??0;
+ $('pending').textContent=r.pending_events??0;
+ $('offline').textContent=r.offline_devices??0;
+ $('stale').textContent=r.stale_devices??0;
+ $('errors').textContent=(r.device_errors??0)+(r.inconsistencies??0);
+ $('operator').textContent='Rol actual: '+(r.operator_role||'operador');
+ if(s==='green'){
+  $('summary').textContent='No se detectan pendientes técnicos ni estudiantes sin verificar.';
+  $('closeReason').textContent='Semáforo VERDE. El cierre solo podrá ejecutarlo un reconciliador o administrador autorizado.';
+ }else if(s==='red'){
+  $('summary').textContent='Existe una inconsistencia o error crítico.';
+  $('closeReason').textContent='Cierre y mensajería bloqueados hasta corregir el problema.';
+ }else{
+  $('summary').textContent='La captura funciona, pero la jornada todavía necesita revisión.';
+  const parts=[];
+  if(r.unverified_students)parts.push(r.unverified_students+' estudiante(s) sin verificar');
+  if(r.pending_events)parts.push(r.pending_events+' evento(s) pendientes');
+  if(r.offline_devices)parts.push(r.offline_devices+' dispositivo(s) offline');
+  if(r.stale_devices)parts.push(r.stale_devices+' dispositivo(s) sin heartbeat reciente');
+  $('closeReason').textContent='No se puede cerrar: '+(parts.length?parts.join(' · '):'revisión requerida');
+ }
+ $('closeBtn').disabled=true;
+ $('diag').textContent=JSON.stringify({status:r.status,messages_may_unlock:r.messages_may_unlock},null,2);
+}
+async function load(){
+ try{
+  $('refresh').disabled=true;
+  const r=await rpc('attendance_reconciliation_status',{});
+  render(r)
+ }catch(e){
+  $('status').className='tag red';$('status').textContent='SIN SESIÓN / ERROR';
+  $('summary').textContent=e.message;
+  $('diag').textContent=e.message
+ }finally{$('refresh').disabled=false}
+}
+$('refresh').onclick=load;
+load();
+</script>
+</body>
+</html>
