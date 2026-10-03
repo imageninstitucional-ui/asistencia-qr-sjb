@@ -58,7 +58,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <div class="card" id="enrollCard" style="display:none">
 <div class="step">PASO 3 · EN LA PC</div>
 <h3>Crear nuevo factor</h3>
-<p>Nombre que quedará registrado: <b>SJB Institucional - Google Authenticator</b></p>
+<p>Nombre interno: <b>SJB Institucional - Google Authenticator</b></p>
+<p>Nombre que verá Google Authenticator: <b>CEGNE San Juan Bautista</b></p>
 <button id="createFactor">CREAR NUEVO FACTOR GOOGLE AUTHENTICATOR</button>
 <p id="createText" class="muted"></p>
 </div>
@@ -245,7 +246,7 @@ $('createFactor').onclick=async()=>{
   const d=await parse(await fetch(PROJECT_URL+'/auth/v1/factors',{
    method:'POST',
    headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},
-   body:JSON.stringify({factor_type:'totp',friendly_name:'SJB Institucional - Google Authenticator'})
+   body:JSON.stringify({factor_type:'totp',friendly_name:'SJB Institucional - Google Authenticator',issuer:'CEGNE San Juan Bautista'})
   }));
   if(!d.id||!d.totp)throw new Error('RESPUESTA_TOTP_INCOMPLETA');
   state.newFactorId=d.id;
