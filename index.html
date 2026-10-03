@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>ASISTENCIA-QR SJB · Piloto v14.28</title>
+<title>ASISTENCIA-QR SJB · Piloto v14.29</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -22,7 +22,7 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.28 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.29 · RESTORE TEST</div></header>
 <main>
 <div class="card">
 <h3>0 · Diagnóstico</h3>
@@ -78,7 +78,7 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 
 <div class="card">
 <h3>8 · Reconciliación</h3>
-<div class="row"><a href="./reconciliacion.html?v=14.23" style="text-decoration:none"><button class="soft" type="button">ABRIR SEMÁFORO DE RECONCILIACIÓN</button></a></div>
+<div class="row"><a href="./reconciliacion.html?v=14.29" style="text-decoration:none"><button class="soft" type="button">ABRIR SEMÁFORO DE RECONCILIACIÓN</button></a></div>
 <p class="muted">Revisa pendientes, dispositivos y estudiantes sin verificar antes de cerrar la jornada.</p>
 </div>
 
@@ -91,7 +91,7 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 <script>
 const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
 const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
-const APP_VERSION='github-pages-v14.28';
+const APP_VERSION='github-pages-v14.29';
 const OFFLINE_LEASE_KEY='sjb_offline_lease_v1';
 const DEVICE_CODE_KEY='sjb_device_code_v1';
 const OFFLINE_LEASE_MS=12*60*60*1000;
@@ -356,17 +356,25 @@ async function sync(){
      p_captured_at:row.captured_at
     });
     await qDelete(row.client_event_id);
+    const localTime=(iso=>{
+      try{return new Intl.DateTimeFormat('es-PE',{timeZone:'America/Lima',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(iso))}
+      catch{return ''}
+    })(r.captured_at||r.original_captured_at||row.captured_at);
+    const student=r.student_name||'ESTUDIANTE';
+    const section=r.section_name?(' · Sección '+r.section_name):'';
+    const time=localTime?(' · Hora '+localTime):'';
     if(r.duplicate_attendance){
-      $('scanResult').textContent='YA REGISTRADO · '+(r.student_name||'');
-      $('scanResult').className='good card';
+      const status=r.daily_status==='late'?'TARDANZA':(r.daily_status==='present'?'PUNTUAL':'YA REGISTRADO');
+      $('scanResult').textContent='YA REGISTRADO · '+student+section+time+' · Estado '+status;
+      $('scanResult').className=r.daily_status==='late'?'warn card':'good card';
     }else if(r.punctuality_classification==='late'){
-      $('scanResult').textContent='TARDANZA · '+(r.student_name||'')+' · '+(r.section_name||'');
+      $('scanResult').textContent='REGISTRADO · '+student+section+time+' · Estado TARDANZA';
       $('scanResult').className='warn card';
     }else if(r.punctuality_classification==='on_time'){
-      $('scanResult').textContent='PUNTUAL · '+(r.student_name||'')+' · '+(r.section_name||'');
+      $('scanResult').textContent='REGISTRADO · '+student+section+time+' · Estado PUNTUAL';
       $('scanResult').className='good card';
     }else{
-      $('scanResult').textContent='REGISTRADO · '+(r.student_name||'')+' · '+(r.section_name||'')+' · HORARIO NO CONFIGURADO';
+      $('scanResult').textContent='REGISTRADO · '+student+section+time+' · HORARIO NO CONFIGURADO';
       $('scanResult').className='good card';
     }
     diag(r)
