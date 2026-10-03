@@ -85,9 +85,18 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <div class="card" id="doneCard" style="display:none">
 <div class="step">PASO 7 · COMPROBACIÓN</div>
 <h3>Nuevo factor registrado</h3>
-<p class="ok"><b>NO BORRES todavía el factor antiguo.</b> Primero haremos un cierre de sesión y un ingreso nuevo usando únicamente Google Authenticator.</p>
+<p class="ok"><b>Nuevo factor verificado.</b> Antes de retirar el antiguo, debe comprobarse un inicio de sesión nuevo usando Google Authenticator.</p>
 <div id="factors"></div>
-<a class="btn" href="./reconciliacion.html?v=14.22">VOLVER A RECONCILIACIÓN</a>
+<a class="btn" href="./reconciliacion.html?v=14.23">VOLVER A RECONCILIACIÓN</a>
+</div>
+
+<div class="card" id="cleanupCard" style="display:none">
+<div class="step">PASO 8 · RETIRAR MFA ANTIGUO</div>
+<h3>Limpieza del factor anterior</h3>
+<p class="notice">Esta acción elimina únicamente el factor antiguo de Supabase. El nuevo <b>SJB Institucional - Google Authenticator</b> debe permanecer verificado.</p>
+<div id="cleanupFactors"></div>
+<button id="removeOldFactor" type="button" class="danger" disabled>RETIRAR FACTOR ANTIGUO</button>
+<p id="cleanupText" class="muted"></p>
 </div>
 </main>
 <script>
@@ -150,6 +159,7 @@ async function inspect(){
   $('sessionState').textContent='SESIÓN ACTIVA · '+String(payload.aal||'aal1').toUpperCase();
   $('sessionText').textContent='Cuenta: '+(u.email||'')+' · Factores TOTP verificados: '+verified.length;
   $('loginCard').style.display='none';
+  renderCleanup(verified,payload);
   if(payload.aal==='aal2'){
     $('oldMfaCard').style.display='none';
     if(state.newFactorId&&state.newQr){
@@ -187,6 +197,63 @@ async function inspect(){
   $('enrollCard').style.display='none'
  }
 }
+
+function cleanText(v){return String(v??'').replace(/[<>&"]/g,'')}
+function renderCleanup(verified,payload){
+ const newFactor=verified.find(f=>f.friendly_name==='SJB Institucional - Google Authenticator');
+ const oldCandidates=verified.filter(f=>f.id!==newFactor?.id);
+ $('cleanupCard').style.display=newFactor&&payload.aal==='aal2'?'block':'none';
+ if(!newFactor)return;
+ $('cleanupFactors').innerHTML=
+   '<div class="factor"><b>NUEVO · '+cleanText(newFactor.friendly_name||'SJB Institucional - Google Authenticator')+'</b><br>Estado: '+cleanText(newFactor.status||'')+' · CONSERVAR</div>'+
+   oldCandidates.map(f=>'<div class="factor"><b>ANTIGUO · '+cleanText(f.friendly_name||'TOTP anterior')+'</b><br>Estado: '+cleanText(f.status||'')+'</div>').join('');
+ if(oldCandidates.length===1){
+   $('removeOldFactor').disabled=false;
+   $('removeOldFactor').dataset.factorId=oldCandidates[0].id;
+   $('removeOldFactor').dataset.factorName=oldCandidates[0].friendly_name||'TOTP anterior';
+   $('cleanupText').textContent='Se detectó un solo factor antiguo. Puede retirarse de forma controlada.';
+ }else if(oldCandidates.length===0){
+   $('removeOldFactor').disabled=true;
+   $('cleanupText').textContent='No quedan factores antiguos. La limpieza de Supabase ya está completa.';
+ }else{
+   $('removeOldFactor').disabled=true;
+   $('cleanupText').textContent='Hay más de un factor antiguo. Por seguridad, no se habilita eliminación automática.';
+ }
+}
+$('removeOldFactor').onclick=async()=>{
+ const factorId=$('removeOldFactor').dataset.factorId||'';
+ const factorName=$('removeOldFactor').dataset.factorName||'TOTP anterior';
+ if(!factorId)return;
+ const typed=prompt('Para retirar SOLO el factor antiguo "'+factorName+'", escribe exactamente: RETIRAR');
+ if(typed!=='RETIRAR'){ $('cleanupText').textContent='Operación cancelada. No se eliminó ningún factor.'; return }
+ try{
+  $('removeOldFactor').disabled=true;
+  $('cleanupText').textContent='Retirando factor antiguo…';
+  if(jwtPayload(state.access).aal!=='aal2')throw new Error('AAL2_REQUIRED');
+  const before=await user();
+  const bf=Array.isArray(before.factors)?before.factors:[];
+  const newFactor=bf.find(f=>f.status==='verified'&&f.factor_type==='totp'&&f.friendly_name==='SJB Institucional - Google Authenticator');
+  const target=bf.find(f=>f.id===factorId&&f.status==='verified'&&f.factor_type==='totp');
+  if(!newFactor)throw new Error('NUEVO_FACTOR_VERIFICADO_NO_ENCONTRADO');
+  if(!target)throw new Error('FACTOR_ANTIGUO_NO_ENCONTRADO');
+  if(target.id===newFactor.id)throw new Error('PROTECCION_NUEVO_FACTOR');
+  await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(factorId),{
+    method:'DELETE',
+    headers:{apikey:KEY,Authorization:'Bearer '+state.access}
+  }));
+  const after=await user();
+  const af=Array.isArray(after.factors)?after.factors:[];
+  const newStillThere=af.some(f=>f.id===newFactor.id&&f.status==='verified');
+  const oldGone=!af.some(f=>f.id===factorId);
+  if(!newStillThere||!oldGone)throw new Error('VERIFICACION_POSTERIOR_FALLÓ');
+  $('cleanupText').textContent='FACTOR ANTIGUO RETIRADO CORRECTAMENTE. El nuevo Google Authenticator permanece verificado.';
+  await inspect()
+ }catch(e){
+  $('cleanupText').textContent='No se pudo retirar el factor antiguo: '+e.message;
+  $('removeOldFactor').disabled=false
+ }
+};
+
 $('login').onclick=async()=>{
  try{
   $('login').disabled=true;$('loginText').textContent='Ingresando…';
