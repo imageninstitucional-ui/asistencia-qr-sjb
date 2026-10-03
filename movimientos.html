@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>ASISTENCIA-QR SJB · Movimientos v14.26</title>
+<title>ASISTENCIA-QR SJB · Movimientos v14.27</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -23,7 +23,7 @@ button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;cursor:point
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Movimientos de estudiantes · v14.26 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Movimientos de estudiantes · v14.27 · RESTORE TEST</div></header>
 <main>
 <div class="card">
 <h3>1 · Sesión</h3>
@@ -146,13 +146,30 @@ async function ensureMfa(){
 }
 async function loadOperator(){
  try{
+  const loginCtx=await rpc('attendance_operator_login_context');
+  state.operator={
+   operator_id:loginCtx.operator_id,
+   operator_name:loginCtx.operator_name,
+   operator_role:loginCtx.operator_role
+  };
+  $('operatorText').textContent=(loginCtx.operator_name||'')+' · '+(loginCtx.operator_role||'');
+  if(!(await ensureMfa())){
+   $('authState').className='tag yellow';
+   $('authState').textContent='MFA REQUERIDA';
+   return
+  }
   const op=await rpc('attendance_movement_operator_context');
   state.operator=op;
-  if(!(await ensureMfa())){$('authState').className='tag yellow';$('authState').textContent='MFA REQUERIDA';return}
-  $('authState').className='tag green';$('authState').textContent='SESIÓN ACTIVA · '+String(op.aal||jwtPayload(state.access).aal||'aal1').toUpperCase();
+  $('authState').className='tag green';
+  $('authState').textContent='SESIÓN ACTIVA · '+String(op.aal||jwtPayload(state.access).aal||'aal1').toUpperCase();
   $('operatorText').textContent=(op.operator_name||'')+' · '+(op.operator_role||'');
   $('searchCard').classList.remove('hidden')
- }catch(e){$('authState').className='tag red';$('authState').textContent='SIN ACCESO';$('operatorText').textContent=e.message;diag(e.message)}
+ }catch(e){
+  $('authState').className='tag red';
+  $('authState').textContent='SIN ACCESO';
+  $('operatorText').textContent=e.message;
+  diag(e.message)
+ }
 }
 async function doSearch(){
  const q=$('query').value.trim();if(q.length<2)return;
