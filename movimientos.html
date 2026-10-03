@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6d1f3b">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>ASISTENCIA-QR SJB · Movimientos v14.26</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
+*{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
+main{max-width:900px;margin:auto;padding:14px}.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+input,select,button,a.btn{font:inherit;border-radius:10px;padding:11px}input,select{border:1px solid #cbd5e1;min-width:0;flex:1;background:#fff}
+button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;cursor:pointer;text-decoration:none}button:disabled{opacity:.5;cursor:not-allowed}
+.alt{background:#6d1f3b}.soft{background:#e8edf5;color:#172033}.danger{background:#991b1b}
+.tag{display:inline-block;padding:7px 10px;border-radius:999px;font-weight:800;font-size:.9rem}.green{background:#dcfce7;color:#166534}.yellow{background:#fef3c7;color:#92400e}.red{background:#fee2e2;color:#991b1b}.blue{background:#dbeafe;color:#1e3a8a}
+.muted{color:#64748b}.big{font-size:1.22rem;font-weight:900}.notice{border-left:5px solid #f59e0b;padding-left:12px}
+.result,.event,.guardian{border:1px solid #e2e8f0;border-radius:13px;padding:12px;background:#f8fafc;margin:8px 0}
+.hidden{display:none!important}pre{white-space:pre-wrap;word-break:break-word;font-size:.82rem}
+</style>
+</head>
+<body>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Movimientos de estudiantes · v14.26 · RESTORE TEST</div></header>
+<main>
+<div class="card">
+<h3>1 · Sesión</h3>
+<div class="row"><input id="email" type="email" value="imagen.institucional@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"></div>
+<div class="row"><input id="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div>
+<div class="row"><span id="authState" class="tag yellow">COMPROBANDO…</span></div>
+<p id="operatorText" class="muted"></p>
+</div>
+
+<div class="card hidden" id="mfaCard">
+<h3>2 · MFA administrativo</h3>
+<p class="muted">Administrador/reconciliador: use Google Authenticator → <b>CEGNE San Juan Bautista</b>.</p>
+<div class="row"><input id="mfaCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="Código MFA"><button id="mfaVerify">VERIFICAR MFA</button></div>
+<p id="mfaText" class="muted"></p>
+</div>
+
+<div class="card hidden" id="searchCard">
+<h3>3 · Buscar estudiante</h3>
+<div class="row"><input id="query" placeholder="Nombre, apellido o DNI"><button id="search">BUSCAR</button></div>
+<p class="muted">Se muestran únicamente estudiantes activos de 2026 autorizados para tu rol.</p>
+<div id="results"></div>
+</div>
+
+<div class="card hidden" id="studentCard">
+<h3>4 · Estudiante seleccionado</h3>
+<div id="studentInfo"></div>
+<div class="row"><span id="presenceTag" class="tag yellow">SIN CONSULTAR</span></div>
+</div>
+
+<div class="card hidden" id="movementCard">
+<h3>5 · Registrar movimiento</h3>
+<div class="grid">
+<select id="movementType">
+<option value="health">Tópico / Salud</option>
+<option value="psychology">Psicología</option>
+<option value="pastoral">Pastoral</option>
+<option value="authorized_permission">Permiso autorizado</option>
+<option value="library">Biblioteca</option>
+<option value="institutional_activity">Actividad institucional</option>
+<option value="other_area">Otra área</option>
+<option value="restroom">Servicios higiénicos</option>
+</select>
+<input id="destination" placeholder="Destino / área">
+</div>
+<input id="reason" placeholder="Motivo u observación">
+<div class="row"><button id="startMovement">REGISTRAR SALIDA</button><button id="endMovement" class="alt" disabled>REGISTRAR REGRESO</button></div>
+<p class="notice"><b>Importante:</b> un movimiento registra ubicación y permanencia. No cambia por sí solo la asistencia diaria.</p>
+</div>
+
+<div class="card hidden" id="pickupCard">
+<h3>6 · Retiro por apoderado</h3>
+<p class="muted">Solo disponible para roles autorizadores. El apoderado debe estar vinculado al estudiante y el documento debe verificarse presencialmente.</p>
+<button id="loadGuardians" class="soft">CARGAR APODERADOS VINCULADOS</button>
+<div id="guardians"></div>
+<div id="pickupForm" class="hidden">
+<input id="pickupReason" placeholder="Motivo del retiro">
+<label><input id="documentVerified" type="checkbox" style="width:auto;flex:none"> Documento de identidad verificado presencialmente</label>
+<button id="pickup" class="danger">REGISTRAR RETIRO AUTORIZADO</button>
+</div>
+</div>
+
+<div class="card hidden" id="timelineCard">
+<h3>7 · Historial del día</h3>
+<button id="refreshTimeline" class="soft">ACTUALIZAR HISTORIAL</button>
+<div id="timeline"></div>
+</div>
+
+<div class="card">
+<div class="row">
+<a class="btn" href="./rondas.html?v=14.25">RONDAS</a>
+<a class="btn" href="./reconciliacion.html?v=14.23">RECONCILIACIÓN</a>
+<a class="btn" href="./">LECTOR QR</a>
+</div>
+<pre id="diag"></pre>
+</div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
+const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
+const $=id=>document.getElementById(id);
+const state={
+ access:localStorage.getItem('sjb_access')||'',
+ refresh:localStorage.getItem('sjb_refresh')||'',
+ expires:Number(localStorage.getItem('sjb_expires')||0),
+ operator:null,student:null,presence:null,mfaFactorId:'',guardians:[],guardianId:''
+};
+function diag(v){$('diag').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function saveSession(d){
+ state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;
+ state.expires=Date.now()+((d.expires_in||3600)*1000);
+ localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))
+}
+function clearSession(){['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));state.access='';state.refresh='';state.expires=0}
+async function parse(r){const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.message||d.msg||d.error_description||d.error||('HTTP '+r.status));return d}
+async function refreshSession(force=false){
+ if(!state.refresh)return false;
+ if(!force&&state.access&&Date.now()<state.expires-60000)return true;
+ try{
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));
+  saveSession(d);return true
+ }catch{return false}
+}
+async function rpc(name,body={}){
+ if(!(await refreshSession(false)))throw new Error('SESIÓN_REQUERIDA');
+ let r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ if(r.status===401&&await refreshSession(true))r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ return parse(r)
+}
+function jwtPayload(token){try{const p=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const q=p+'='.repeat((4-p.length%4)%4);return JSON.parse(atob(q))}catch{return {}}}
+async function ensureMfa(){
+ const role=state.operator?.operator_role||'';
+ const aal=jwtPayload(state.access).aal||'aal1';
+ if(!['administrator','reconciler'].includes(role)||aal==='aal2'){$('mfaCard').classList.add('hidden');return true}
+ const u=await parse(await fetch(PROJECT_URL+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+state.access}}));
+ const factors=(u.factors||[]).filter(f=>f.status==='verified'&&f.factor_type==='totp');
+ const preferred=factors.find(f=>f.friendly_name==='SJB Institucional - Google Authenticator')||factors[0];
+ if(!preferred)throw new Error('MFA_TOTP_NO_CONFIGURADA');
+ state.mfaFactorId=preferred.id;$('mfaCard').classList.remove('hidden');$('mfaText').textContent='Sesión AAL1 · falta MFA.';return false
+}
+async function loadOperator(){
+ try{
+  const op=await rpc('attendance_movement_operator_context');
+  state.operator=op;
+  if(!(await ensureMfa())){$('authState').className='tag yellow';$('authState').textContent='MFA REQUERIDA';return}
+  $('authState').className='tag green';$('authState').textContent='SESIÓN ACTIVA · '+String(op.aal||jwtPayload(state.access).aal||'aal1').toUpperCase();
+  $('operatorText').textContent=(op.operator_name||'')+' · '+(op.operator_role||'');
+  $('searchCard').classList.remove('hidden')
+ }catch(e){$('authState').className='tag red';$('authState').textContent='SIN ACCESO';$('operatorText').textContent=e.message;diag(e.message)}
+}
+async function doSearch(){
+ const q=$('query').value.trim();if(q.length<2)return;
+ try{
+  $('search').disabled=true;
+  const d=await rpc('attendance_movement_search_students',{p_query:q,p_limit:20});
+  const rows=Array.isArray(d.students)?d.students:[];
+  $('results').innerHTML=rows.length?rows.map(s=>{
+   const mv=s.active_movement_id?'<span class="tag blue">MOVIMIENTO ACTIVO</span>':'';
+   return '<div class="result"><b>'+esc(s.name)+'</b><p class="muted">'+esc(s.level_name)+' · '+esc(s.grade_name)+' '+esc(s.section_name)+' · '+esc(s.campus_name)+'</p>'+mv+' <button class="pick" data-id="'+esc(s.student_id)+'">SELECCIONAR</button></div>'
+  }).join(''):'<p class="muted">Sin coincidencias.</p>';
+  document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>selectStudent(b.dataset.id))
+ }catch(e){diag(e.message)}
+ finally{$('search').disabled=false}
+}
+async function selectStudent(id){
+ const q=$('query').value.trim();
+ const d=await rpc('attendance_movement_search_students',{p_query:q,p_limit:50});
+ state.student=(d.students||[]).find(x=>x.student_id===id)||{student_id:id};
+ $('studentCard').classList.remove('hidden');$('movementCard').classList.remove('hidden');$('timelineCard').classList.remove('hidden');
+ if(state.operator?.can_guardian_pickup)$('pickupCard').classList.remove('hidden');else $('pickupCard').classList.add('hidden');
+ await refreshPresence();await refreshTimeline()
+}
+function typeLabel(x){return ({health:'Tópico / Salud',psychology:'Psicología',pastoral:'Pastoral',authorized_permission:'Permiso autorizado',library:'Biblioteca',institutional_activity:'Actividad institucional',other_area:'Otra área',restroom:'Servicios higiénicos',guardian_pickup:'Retiro por apoderado'})[x]||x}
+async function refreshPresence(){
+ try{
+  const p=await rpc('attendance_student_presence_context',{p_student_id:state.student.student_id});
+  state.presence=p;
+  $('studentInfo').innerHTML='<b>'+esc(p.student_name)+'</b><p>'+esc(p.level_name)+' · '+esc(p.grade_name)+' '+esc(p.section_name)+' · '+esc(p.campus_name)+'</p><p class="muted">Asistencia del día: '+esc(p.attendance_status||'sin registro')+'</p>';
+  if(p.presence==='justified_out'){
+    $('presenceTag').className='tag blue';$('presenceTag').textContent='FUERA · '+typeLabel(p.movement_type);
+    $('endMovement').disabled=false;$('startMovement').disabled=true;
+    $('destination').value=p.destination||'';$('reason').value=p.reason||''
+  }else{
+    $('presenceTag').className='tag green';$('presenceTag').textContent='SIN MOVIMIENTO ACTIVO';
+    $('endMovement').disabled=true;$('startMovement').disabled=false
+  }
+ }catch(e){diag(e.message)}
+}
+async function startMovement(){
+ try{
+  $('startMovement').disabled=true;
+  const d=await rpc('attendance_register_movement',{
+   p_client_event_id:crypto.randomUUID(),
+   p_student_id:state.student.student_id,
+   p_movement_type:$('movementType').value,
+   p_destination:$('destination').value.trim()||null,
+   p_reason:$('reason').value.trim()||null,
+   p_started_at:new Date().toISOString()
+  });
+  diag(d);await refreshPresence();await refreshTimeline()
+ }catch(e){alert('No se pudo registrar: '+e.message);$('startMovement').disabled=false}
+}
+async function endMovement(){
+ if(!confirm('¿Registrar el regreso / fin del movimiento activo?'))return;
+ try{
+  $('endMovement').disabled=true;
+  const d=await rpc('attendance_end_movement',{p_student_id:state.student.student_id,p_ended_at:new Date().toISOString()});
+  diag(d);$('destination').value='';$('reason').value='';await refreshPresence();await refreshTimeline()
+ }catch(e){alert('No se pudo registrar regreso: '+e.message);$('endMovement').disabled=false}
+}
+async function loadGuardians(){
+ try{
+  const d=await rpc('attendance_guardians_for_student',{p_student_id:state.student.student_id});
+  state.guardians=Array.isArray(d.guardians)?d.guardians:[];
+  $('guardians').innerHTML=state.guardians.map(g=>'<div class="guardian"><label><input type="radio" name="guardian" value="'+esc(g.guardian_id)+'" style="width:auto;flex:none"> <b>'+esc(g.name)+'</b> · '+esc(g.relationship||'')+'</label></div>').join('')||'<p class="muted">No hay apoderados activos vinculados.</p>';
+  document.querySelectorAll('input[name="guardian"]').forEach(r=>r.onchange=()=>{state.guardianId=r.value;$('pickupForm').classList.remove('hidden')})
+ }catch(e){alert('No se pudieron cargar apoderados: '+e.message)}
+}
+async function pickup(){
+ if(!state.guardianId)return alert('Seleccione un apoderado.');
+ if(!$('documentVerified').checked)return alert('Debe verificar presencialmente el documento.');
+ const reason=$('pickupReason').value.trim();if(!reason)return alert('Ingrese el motivo del retiro.');
+ if(!confirm('¿Registrar el retiro autorizado con el apoderado seleccionado?'))return;
+ try{
+  $('pickup').disabled=true;
+  const d=await rpc('attendance_register_guardian_pickup',{
+   p_student_id:state.student.student_id,p_guardian_id:state.guardianId,p_reason:reason,p_document_verified:true
+  });
+  alert('Retiro registrado correctamente.');diag(d);await refreshPresence();await refreshTimeline()
+ }catch(e){alert('No se pudo registrar retiro: '+e.message)}
+ finally{$('pickup').disabled=false}
+}
+async function refreshTimeline(){
+ if(!state.student)return;
+ try{
+  const d=await rpc('attendance_student_timeline',{p_student_id:state.student.student_id,p_date:new Date().toLocaleDateString('en-CA')});
+  const rows=Array.isArray(d.events)?d.events:[];
+  $('timeline').innerHTML=rows.length?rows.map(e=>'<div class="event"><b>'+esc(e.type)+'</b> · '+esc(e.status||'')+'<p>'+esc(e.detail||'')+'</p><p class="muted">'+esc(new Date(e.at).toLocaleString())+'</p></div>').join(''):'<p class="muted">Sin eventos hoy.</p>'
+ }catch(e){diag(e.message)}
+}
+$('login').onclick=async()=>{
+ try{
+  $('login').disabled=true;
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})}));
+  saveSession(d);$('password').value='';await loadOperator()
+ }catch(e){$('authState').className='tag red';$('authState').textContent='ERROR';diag(e.message)}
+ finally{$('login').disabled=false}
+};
+$('logout').onclick=()=>{clearSession();location.reload()};
+$('mfaVerify').onclick=async()=>{
+ const code=$('mfaCode').value.trim();if(!/^\d{6}$/.test(code))return;
+ try{
+  $('mfaVerify').disabled=true;
+  const ch=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(state.mfaFactorId)+'/challenge',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:'{}'}));
+  const v=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(state.mfaFactorId)+'/verify',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify({challenge_id:ch.id||ch.challenge_id,code})}));
+  saveSession(v.session||v);$('mfaCode').value='';await loadOperator()
+ }catch(e){$('mfaText').textContent='No se pudo verificar: '+e.message}
+ finally{$('mfaVerify').disabled=false}
+};
+$('search').onclick=doSearch;$('query').onkeydown=e=>{if(e.key==='Enter')doSearch()};
+$('startMovement').onclick=startMovement;$('endMovement').onclick=endMovement;$('loadGuardians').onclick=loadGuardians;$('pickup').onclick=pickup;$('refreshTimeline').onclick=refreshTimeline;
+if(state.access||state.refresh)loadOperator();else{$('authState').className='tag yellow';$('authState').textContent='INICIA SESIÓN'}
+</script>
+</body>
+</html>
