@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#6d1f3b">
-<title>ASISTENCIA-QR SJB · Reconciliación v14.15</title>
+<title>ASISTENCIA-QR SJB · Reconciliación v14.16</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
@@ -25,13 +25,14 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.15 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.16 · RESTORE TEST</div></header>
 <main>
 <div class="card" id="loginCard">
 <h3>Acceso</h3>
 <p class="muted">Inicia sesión en este dispositivo para consultar la reconciliación.</p>
 <div class="row"><input id="email" type="email" value="dennis.subia@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"></div>
 <div class="row"><input id="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" type="button">CERRAR SESIÓN</button></div>
+<div class="row"><button id="recover" type="button" class="danger">RECUPERAR CONTRASEÑA</button></div>
 <p id="authText" class="muted">Comprobando sesión…</p>
 </div>
 
@@ -299,6 +300,25 @@ $('login').onclick=async()=>{
  }catch(e){
   $('authText').textContent='No se pudo iniciar sesión: '+e.message
  }finally{$('login').disabled=false}
+};
+$('recover').onclick=async()=>{
+ try{
+  const email=$('email').value.trim();
+  if(!email){$('authText').textContent='Ingrese primero el correo institucional.';return}
+  $('recover').disabled=true;
+  $('authText').textContent='Solicitando enlace de recuperación…';
+  const redirectTo=new URL('./reset.html',location.href).href;
+  const r=await fetch(PROJECT_URL+'/auth/v1/recover?redirect_to='+encodeURIComponent(redirectTo),{
+   method:'POST',
+   headers:{apikey:KEY,'Content-Type':'application/json'},
+   body:JSON.stringify({email})
+  });
+  const t=await r.text();let d={};try{d=JSON.parse(t)}catch{}
+  if(!r.ok)throw new Error(d.message||d.msg||d.error_description||d.error||('HTTP '+r.status));
+  $('authText').textContent='ENLACE SOLICITADO · revisa el correo '+email+' y abre el mensaje de recuperación.';
+ }catch(e){
+  $('authText').textContent='No se pudo solicitar recuperación: '+e.message
+ }finally{$('recover').disabled=false}
 };
 $('logout').onclick=()=>{
  clearSession();
