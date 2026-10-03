@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#6d1f3b">
-<title>ASISTENCIA-QR SJB · Reconciliación v14.21</title>
+<title>ASISTENCIA-QR SJB · Reconciliación v14.22</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
@@ -25,7 +25,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.21 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.22 · RESTORE TEST</div></header>
 <main>
 <div class="card" id="loginCard">
 <h3>Acceso</h3>
@@ -88,6 +88,14 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <div class="row">
  <span id="sectionCloseState" class="tag yellow">SIN COMPROBAR</span>
  <button id="sectionCloseBtn" type="button" class="danger" disabled>CERRAR AULA</button>
+</div>
+<div id="reopenBox" style="display:none;margin-top:12px">
+ <p class="notice"><b>AULA CERRADA:</b> no se permiten nuevos escaneos ni cambios de asistencia hasta una reapertura autorizada.</p>
+ <div class="row">
+  <input id="reopenReason" placeholder="Motivo obligatorio de reapertura (mínimo 8 caracteres)">
+  <button id="reopenSectionBtn" type="button">REABRIR AULA</button>
+ </div>
+ <p id="reopenText" class="muted"></p>
 </div>
 </div>
 
@@ -327,26 +335,72 @@ async function checkSectionClose(sectionId){
   });
   const reasons=Array.isArray(r.close_reasons)?r.close_reasons:[];
   $('sectionCloseTitle').textContent='Pre-cierre · '+(r.level_name||'')+' '+(r.grade_name||'')+' '+(r.section_name||'');
-  if(r.status==='red'){
+  const isClosed=r.saved_status==='closed';
+  $('reopenBox').style.display=isClosed&&['administrator','reconciler'].includes(state.role)?'block':'none';
+  $('reopenReason').value='';
+  $('reopenText').textContent='';
+  if(isClosed){
+    $('sectionCloseState').className='tag green';
+    $('sectionCloseState').textContent='AULA CERRADA';
+    $('sectionCloseText').textContent=
+      'Este salón ya fue cerrado. Los escaneos QR y cambios de asistencia están bloqueados hasta una reapertura autorizada.';
+    $('sectionCloseBtn').disabled=true;
+  }else if(r.status==='red'){
     $('sectionCloseState').className='tag red';
     $('sectionCloseState').textContent='ROJO · BLOQUEADO';
+    $('sectionCloseText').textContent=
+      'Esperados '+r.expected_students+' · Verificados '+r.marked_students+' · Sin verificar '+r.unverified_students+
+      (reasons.length?' · '+reasons.map(sectionReasonLabel).join(' · '):' · Sin bloqueos');
+    $('sectionCloseBtn').disabled=true;
   }else if(r.can_close){
     $('sectionCloseState').className='tag green';
     $('sectionCloseState').textContent='VERDE · LISTO PARA CERRAR';
+    $('sectionCloseText').textContent=
+      'Esperados '+r.expected_students+' · Verificados '+r.marked_students+' · Sin verificar '+r.unverified_students+' · Sin bloqueos';
+    $('sectionCloseBtn').disabled=false;
   }else{
     $('sectionCloseState').className='tag yellow';
     $('sectionCloseState').textContent='AMARILLO · REVISAR';
+    $('sectionCloseText').textContent=
+      'Esperados '+r.expected_students+' · Verificados '+r.marked_students+' · Sin verificar '+r.unverified_students+
+      (reasons.length?' · '+reasons.map(sectionReasonLabel).join(' · '):' · Sin bloqueos');
+    $('sectionCloseBtn').disabled=true;
   }
-  $('sectionCloseText').textContent=
-    'Esperados '+r.expected_students+' · Verificados '+r.marked_students+' · Sin verificar '+r.unverified_students+
-    (reasons.length?' · '+reasons.map(sectionReasonLabel).join(' · '):' · Sin bloqueos');
-  $('sectionCloseBtn').disabled=!r.can_close;
   $('sectionCloseCard').scrollIntoView({behavior:'smooth',block:'start'})
  }catch(e){
   $('sectionCloseState').className='tag red';
   $('sectionCloseState').textContent='ERROR';
   $('sectionCloseText').textContent=e.message;
   $('sectionCloseBtn').disabled=true
+ }
+}
+async function reopenSelectedSection(){
+ if(!state.selectedSectionId)return;
+ const reason=$('reopenReason').value.trim();
+ if(reason.length<8){
+  $('reopenText').textContent='Escribe un motivo de al menos 8 caracteres.';
+  return
+ }
+ if(!confirm('¿Reabrir esta aula? Esto volverá a permitir escaneos y correcciones de asistencia.'))return;
+ try{
+  $('reopenSectionBtn').disabled=true;
+  $('reopenSectionBtn').textContent='REABRIENDO…';
+  const r=await rpc('attendance_reopen_section',{
+    p_section_id:state.selectedSectionId,
+    p_date:state.currentDate||null,
+    p_reason:reason
+  });
+  $('reopenText').textContent='Aula reabierta por '+(r.reopened_by||'operador autorizado')+'. Motivo auditado.';
+  $('sectionCloseState').className='tag yellow';
+  $('sectionCloseState').textContent='AULA REABIERTA · REVISAR';
+  $('reopenBox').style.display='none';
+  await checkSectionClose(state.selectedSectionId);
+  await loadSections()
+ }catch(e){
+  $('reopenText').textContent='No se pudo reabrir: '+e.message
+ }finally{
+  $('reopenSectionBtn').disabled=false;
+  $('reopenSectionBtn').textContent='REABRIR AULA'
  }
 }
 async function closeSelectedSection(){
@@ -626,12 +680,14 @@ $('logout').onclick=()=>{
  $('sectionSummary').textContent='Inicia sesión para consultar las aulas.';
  $('detailCard').style.display='none';
  $('sectionCloseCard').style.display='none';
+ $('reopenBox').style.display='none';$('reopenReason').value='';$('reopenText').textContent='';
  $('messageGate').className='tag yellow';$('messageGate').textContent='SIN SESIÓN';
  $('messageGateText').textContent='Inicia sesión para consultar la mensajería.';
  ['qBlocked','qReady','qSent','qFailed'].forEach(id=>$(id).textContent='—');
 };
 $('refresh').onclick=load;
 $('sectionCloseBtn').onclick=closeSelectedSection;
+$('reopenSectionBtn').onclick=reopenSelectedSection;
 $('precloseBtn').onclick=runPreclose;
 $('messageGateBtn').onclick=loadMessageGate;
 $('closeBtn').onclick=closeDay;
