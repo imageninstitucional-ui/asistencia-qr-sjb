@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#6d1f3b">
 <meta name="referrer" content="no-referrer">
-<title>ASISTENCIA-QR SJB · Piloto v14.8</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>ASISTENCIA-QR SJB · Piloto v14.9</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -20,11 +22,11 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.8 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.9 · RESTORE TEST</div></header>
 <main>
 <div class="card">
 <h3>0 · Diagnóstico</h3>
-<div class="row"><span id="secureState" class="tag">HTTPS</span><span id="cameraApiState" class="tag">CÁMARA</span><span id="engineState" class="tag">QR</span><span id="netState" class="tag">RED</span><span id="heartbeatState" class="tag">HEARTBEAT</span></div>
+<div class="row"><span id="secureState" class="tag">HTTPS</span><span id="cameraApiState" class="tag">CÁMARA</span><span id="engineState" class="tag">QR</span><span id="netState" class="tag">RED</span><span id="heartbeatState" class="tag">HEARTBEAT</span><span id="pwaState" class="tag">PWA</span></div>
 <p id="origin" class="muted"></p>
 </div>
 
@@ -65,18 +67,54 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 <script>
 const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
 const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
-const APP_VERSION='github-pages-v14.8';
+const APP_VERSION='github-pages-v14.9';
+const OFFLINE_LEASE_KEY='sjb_offline_lease_v1';
+const OFFLINE_LEASE_MS=12*60*60*1000;
 const $=id=>document.getElementById(id);
 const state={
  access:localStorage.getItem('sjb_access')||'',
  refresh:localStorage.getItem('sjb_refresh')||'',
  expires:Number(localStorage.getItem('sjb_expires')||0),
  operator:null,deviceOk:false,stream:null,scanning:false,busy:false,
- lastValue:'',lastAt:0,blockedToken:'',qrLastSeenAt:0,detector:null,engine:'none'
+ lastValue:'',lastAt:0,blockedToken:'',qrLastSeenAt:0,detector:null,engine:'none',offlineLease:null
 };
 function diag(v){$('diag').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
 function setAuth(ok,t){$('authState').className='tag '+(ok?'good':'warn');$('authState').textContent=t}
 function setDevice(ok,t){$('deviceState').className='tag '+(ok?'good':'warn');$('deviceState').textContent=t}
+function localDay(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function loadOfflineLease(){
+ try{
+  const x=JSON.parse(localStorage.getItem(OFFLINE_LEASE_KEY)||'null');
+  if(!x||!x.authorized_at||!x.device_code||!x.operator_id)return null;
+  if(Date.now()-Number(x.authorized_at)>OFFLINE_LEASE_MS)return null;
+  if(x.local_day!==localDay())return null;
+  return x
+ }catch{return null}
+}
+function saveOfflineLease(){
+ if(!state.operator||!state.deviceOk)return;
+ const x={
+  authorized_at:Date.now(),
+  local_day:localDay(),
+  device_code:$('deviceCode').value.trim(),
+  operator_id:state.operator.operator_id||'',
+  display_name:state.operator.display_name||'',
+  operator_role:state.operator.operator_role||''
+ };
+ localStorage.setItem(OFFLINE_LEASE_KEY,JSON.stringify(x));state.offlineLease=x
+}
+function restoreOfflineMode(){
+ const x=loadOfflineLease();state.offlineLease=x;
+ if(!x)return false;
+ if(x.device_code!==$('deviceCode').value.trim())return false;
+ state.operator={authorized:true,operator_id:x.operator_id,display_name:x.display_name,operator_role:x.operator_role,offline:true};
+ state.deviceOk=true;
+ setAuth(true,'MODO OFFLINE · VALIDACIÓN PENDIENTE');
+ $('operatorState').textContent=(x.display_name||'')+' · '+(x.operator_role||'')+' · contingencia';
+ setDevice(true,'AUTORIZACIÓN LOCAL TEMPORAL');
+ $('heartbeatState').className='tag warn';$('heartbeatState').textContent='OFFLINE';
+ return true
+}
 function saveSession(d){
  state.access=d.access_token||''; state.refresh=d.refresh_token||state.refresh;
  state.expires=Date.now()+((d.expires_in||3600)*1000);
@@ -122,6 +160,7 @@ async function rpc(name,body={}){
  return parse(r)
 }
 async function loadContext(){
+ if(!navigator.onLine)return restoreOfflineMode();
  try{
   const r=await rpc('attendance_my_context');
   if(!r.authorized)throw new Error(r.reason||'OPERADOR_NO_AUTORIZADO');
@@ -212,12 +251,16 @@ setInterval(heartbeat,30000);
 
 async function checkDevice(){
  try{
-  if(!state.operator&&!(await loadContext()))throw new Error('INICIE_SESIÓN');
   const code=$('deviceCode').value.trim();if(!code)throw new Error('FALTA_CÓDIGO_DISPOSITIVO');
+  if(!navigator.onLine){
+   if(restoreOfflineMode())return true;
+   throw new Error('SIN_AUTORIZACIÓN_OFFLINE_VIGENTE');
+  }
+  if(!state.operator&&!(await loadContext()))throw new Error('INICIE_SESIÓN');
   const r=await rpc('attendance_device_status',{p_device_code:code});
   if(!r.authorized)throw new Error(r.reason||'DISPOSITIVO_NO_AUTORIZADO');
   state.deviceOk=true;setDevice(true,'DISPOSITIVO AUTORIZADO');diag(r);
-  await heartbeat();await sync();return true
+  saveOfflineLease();await heartbeat();await sync();return true
  }catch(e){state.deviceOk=false;setDevice(false,'NO AUTORIZADO');diag(e.message);return false}
 }
 $('checkDevice').onclick=checkDevice;
@@ -226,8 +269,16 @@ function net(){
  $('netState').textContent=navigator.onLine?'ONLINE':'OFFLINE';
  $('netState').className='tag '+(navigator.onLine?'good':'warn')
 }
-window.addEventListener('online',()=>{net();heartbeat();sync()});
-window.addEventListener('offline',()=>{net();$('heartbeatState').className='tag warn';$('heartbeatState').textContent='OFFLINE'});
+window.addEventListener('online',async()=>{
+ net();$('syncState').className='tag warn';$('syncState').textContent='REVALIDANDO…';
+ state.deviceOk=false;state.operator=null;
+ if(await loadContext())await checkDevice();
+});
+window.addEventListener('offline',async()=>{
+ net();restoreOfflineMode();
+ $('heartbeatState').className='tag warn';$('heartbeatState').textContent='OFFLINE';
+ const n=await updateQueue();$('syncState').className='tag warn';$('syncState').textContent=n?'PENDIENTE OFFLINE':'OFFLINE LISTO';
+});
 
 async function capture(token,source){
  token=(token||'').trim();if(!token)return;
@@ -293,7 +344,7 @@ async function loadJsQR(){
  if(window.jsQR)return true;
  return new Promise(resolve=>{
   const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+  s.src='./jsQR-1.4.0.js';
   s.onload=()=>resolve(true);s.onerror=()=>resolve(false);document.head.appendChild(s)
  })
 }
@@ -361,7 +412,17 @@ $('camera').onclick=startCamera;$('stopCamera').onclick=stopCamera;
  $('cameraApiState').className='tag '+(navigator.mediaDevices?.getUserMedia?'good':'bad');
  $('cameraApiState').textContent=navigator.mediaDevices?.getUserMedia?'CÁMARA DISPONIBLE':'SIN API CÁMARA';
  net();await chooseEngine();await updateQueue();
- if(state.access&&await loadContext())await checkDevice();
+ if('serviceWorker'in navigator){
+  try{
+   await navigator.serviceWorker.register('./sw.js',{scope:'./'});
+   $('pwaState').className='tag good';$('pwaState').textContent='PWA LISTA'
+  }catch(e){$('pwaState').className='tag warn';$('pwaState').textContent='PWA PENDIENTE'}
+ }else{$('pwaState').className='tag warn';$('pwaState').textContent='SIN PWA'}
+ if(navigator.onLine){
+  if(state.access&&await loadContext())await checkDevice();
+ }else{
+  restoreOfflineMode();
+ }
 })();
 </script>
 </body>
