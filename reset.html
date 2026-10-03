@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#6d1f3b">
-<title>ASISTENCIA-QR SJB · Nueva contraseña</title>
+<title>ASISTENCIA-QR SJB · Nueva contraseña v14.17</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;background:#eef2f6;color:#172033}
 *{box-sizing:border-box}body{margin:0}header{padding:20px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
@@ -15,9 +15,15 @@ button{border:0;background:#243f68;color:white;font-weight:800}.good{background:
 </style>
 </head>
 <body>
-<header><b>ASISTENCIA-QR SJB</b><div>Recuperación de contraseña</div></header>
+<header><b>ASISTENCIA-QR SJB</b><div>Recuperación de contraseña · v14.17</div></header>
 <main>
 <div id="state" class="card warn"><b>VALIDANDO ENLACE DE RECUPERACIÓN…</b></div>
+<div id="mfaForm" class="card" style="display:none">
+<h2>Segunda verificación requerida</h2>
+<p class="muted">Abra EN EL CELULAR la app autenticadora configurada como <b>San Juan Conecta</b> e ingrese aquí EN LA PC el código actual de 6 dígitos.</p>
+<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Código de 6 dígitos">
+<button id="verifyMfa">VERIFICAR MFA</button>
+</div>
 <div id="form" class="card" style="display:none">
 <h2>Crear nueva contraseña</h2>
 <p class="muted">Use al menos 10 caracteres. No comparta su contraseña.</p>
@@ -32,9 +38,39 @@ const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
 const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
 const stateEl=document.getElementById('state');
 const form=document.getElementById('form');
+const mfaForm=document.getElementById('mfaForm');
 let accessToken=null;
+let refreshToken=null;
+let factorId=null;
 function show(text,kind){stateEl.className='card '+kind;stateEl.innerHTML='<b>'+text+'</b>'}
 async function parse(r){const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.msg||d.message||d.error_description||d.error||('HTTP '+r.status));return d}
+function jwtPayload(token){
+ try{
+  const p=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(decodeURIComponent(atob(p).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')))
+ }catch{return {}}
+}
+async function prepareSecurityStep(){
+ const payload=jwtPayload(accessToken);
+ if(payload.aal==='aal2'){
+  show('SESIÓN AAL2 CONFIRMADA. Ahora cree su nueva contraseña.','good');
+  form.style.display='block';
+  return
+ }
+ const user=await parse(await fetch(PROJECT_URL+'/auth/v1/user',{
+  headers:{apikey:KEY,Authorization:'Bearer '+accessToken}
+ }));
+ const factors=(user.factors||[]).filter(f=>f.status==='verified');
+ const totp=factors.find(f=>f.factor_type==='totp');
+ if(!totp){
+  show('ENLACE CONFIRMADO. Ahora cree su nueva contraseña.','good');
+  form.style.display='block';
+  return
+ }
+ factorId=totp.id;
+ show('ENLACE CONFIRMADO · MFA REQUERIDA. Complete la segunda verificación.','warn');
+ mfaForm.style.display='block';
+}
 async function establish(){
  try{
    const qs=new URLSearchParams(location.search);
@@ -47,17 +83,50 @@ async function establish(){
        body:JSON.stringify({type,token_hash:tokenHash})
      }));
      accessToken=d.access_token||d.session?.access_token||null;
+     refreshToken=d.refresh_token||d.session?.refresh_token||null;
    }else{
      accessToken=hs.get('access_token');
+     refreshToken=hs.get('refresh_token');
    }
    if(!accessToken) throw new Error('El enlace no contiene una sesión de recuperación válida.');
    history.replaceState(null,'',location.pathname);
-   show('ENLACE CONFIRMADO. Ahora cree su nueva contraseña.','good');
-   form.style.display='block';
+   await prepareSecurityStep();
  }catch(e){
    show('NO SE PUDO VALIDAR EL ENLACE: '+e.message,'bad');
  }
 }
+document.getElementById('verifyMfa').onclick=async()=>{
+ const code=document.getElementById('mfaCode').value.trim();
+ if(!/^\d{6}$/.test(code))return show('Ingrese el código de 6 dígitos de su app autenticadora.','bad');
+ if(!factorId||!accessToken)return show('No hay un factor MFA disponible para verificar.','bad');
+ try{
+  document.getElementById('verifyMfa').disabled=true;
+  show('VERIFICANDO MFA…','warn');
+  const challenge=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(factorId)+'/challenge',{
+   method:'POST',
+   headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+   body:JSON.stringify({})
+  }));
+  const challengeId=challenge.id||challenge.challenge_id;
+  if(!challengeId)throw new Error('No se recibió un desafío MFA válido.');
+  const verified=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(factorId)+'/verify',{
+   method:'POST',
+   headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+   body:JSON.stringify({challenge_id:challengeId,code})
+  }));
+  accessToken=verified.access_token||verified.session?.access_token||accessToken;
+  refreshToken=verified.refresh_token||verified.session?.refresh_token||refreshToken;
+  const payload=jwtPayload(accessToken);
+  if(payload.aal!=='aal2')throw new Error('La sesión no alcanzó AAL2.');
+  document.getElementById('mfaCode').value='';
+  mfaForm.style.display='none';
+  form.style.display='block';
+  show('MFA CONFIRMADA · SESIÓN AAL2. Ahora cree su nueva contraseña.','good');
+ }catch(e){
+  show('NO SE PUDO VERIFICAR MFA: '+e.message,'bad');
+  document.getElementById('verifyMfa').disabled=false;
+ }
+};
 document.getElementById('save').onclick=async()=>{
  const a=document.getElementById('p1').value;
  const b=document.getElementById('p2').value;
