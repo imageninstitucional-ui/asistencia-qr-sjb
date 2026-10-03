@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>ASISTENCIA-QR SJB · Piloto v14.11</title>
+<title>ASISTENCIA-QR SJB · Piloto v14.12</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -22,7 +22,7 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.11 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.12 · RESTORE TEST</div></header>
 <main>
 <div class="card">
 <h3>0 · Diagnóstico</h3>
@@ -41,7 +41,7 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 
 <div class="card">
 <h3>2 · Dispositivo</h3>
-<div class="row"><input id="deviceCode" value="SJB-4DCFD8651438417B99B2" placeholder="Código de dispositivo"><button id="checkDevice">VERIFICAR DISPOSITIVO</button></div>
+<div class="row"><input id="deviceCode" placeholder="Código de dispositivo"><button id="checkDevice">VERIFICAR DISPOSITIVO</button></div>
 <div id="deviceState" class="tag warn">NO VERIFICADO</div>
 </div>
 
@@ -67,8 +67,9 @@ video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{displ
 <script>
 const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
 const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
-const APP_VERSION='github-pages-v14.11';
+const APP_VERSION='github-pages-v14.12';
 const OFFLINE_LEASE_KEY='sjb_offline_lease_v1';
+const DEVICE_CODE_KEY='sjb_device_code_v1';
 const OFFLINE_LEASE_MS=12*60*60*1000;
 const $=id=>document.getElementById(id);
 const state={
@@ -262,6 +263,7 @@ async function checkDevice(){
   const r=await rpc('attendance_device_status',{p_device_code:code});
   if(!r.authorized)throw new Error(r.reason||'DISPOSITIVO_NO_AUTORIZADO');
   state.deviceOk=true;setDevice(true,'DISPOSITIVO AUTORIZADO');diag(r);
+  localStorage.setItem(DEVICE_CODE_KEY,code);
   saveOfflineLease();await heartbeat();await sync();return true
  }catch(e){state.deviceOk=false;setDevice(false,'NO AUTORIZADO');diag(e.message);return false}
 }
@@ -422,6 +424,8 @@ $('camera').onclick=startCamera;$('stopCamera').onclick=stopCamera;
 
 (async()=>{
  $('origin').textContent='Origen: '+location.origin;
+ const savedDeviceCode=localStorage.getItem(DEVICE_CODE_KEY)||'';
+ if(savedDeviceCode)$('deviceCode').value=savedDeviceCode;
  $('secureState').className='tag '+(window.isSecureContext?'good':'bad');
  $('secureState').textContent=window.isSecureContext?'HTTPS SEGURO':'NO SEGURO';
  $('cameraApiState').className='tag '+(navigator.mediaDevices?.getUserMedia?'good':'bad');
