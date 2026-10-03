@@ -185,6 +185,8 @@ $('login').onclick=async()=>{
  finally{$('login').disabled=false}
 };
 $('logout').onclick=()=>{
+ localStorage.removeItem(OFFLINE_LEASE_KEY);
+ state.offlineLease=null;
  clearSession();stopCamera();setAuth(false,'SIN SESIÓN');setDevice(false,'NO VERIFICADO');
  $('operatorState').textContent='';diag('Sesión cerrada.')
 };
