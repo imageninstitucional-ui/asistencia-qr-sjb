@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6d1f3b">
+<meta name="referrer" content="no-referrer">
+<title>ASISTENCIA-QR SJB · Piloto v14.5</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
+*{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
+main{max-width:760px;margin:auto;padding:14px}.card{background:#fff;border-radius:15px;padding:15px;margin:11px 0;box-shadow:0 2px 12px #0001}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input,button{font:inherit;border-radius:10px;padding:11px}
+input{border:1px solid #cbd5e1;min-width:0;flex:1}button{border:0;background:#243f68;color:#fff;font-weight:800;cursor:pointer}
+button.alt{background:#6d1f3b}button.soft{background:#e8edf5;color:#172033}.tag{display:inline-block;padding:6px 9px;border-radius:999px;background:#eef2ff;font-size:.88rem;font-weight:700}
+.good{background:#dcfce7}.warn{background:#fef3c7}.bad{background:#fee2e2}.muted{color:#64748b}
+video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{display:none}pre{white-space:pre-wrap;word-break:break-word;font-size:.82rem}
+#scanResult{font-size:1.05rem;font-weight:750}.big{font-size:1.22rem;font-weight:850}
+</style>
+</head>
+<body>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector piloto HTTPS v14.5 · RESTORE TEST</div></header>
+<main>
+<div class="card">
+<h3>0 · Diagnóstico</h3>
+<div class="row"><span id="secureState" class="tag">HTTPS</span><span id="cameraApiState" class="tag">CÁMARA</span><span id="engineState" class="tag">QR</span><span id="netState" class="tag">RED</span></div>
+<p id="origin" class="muted"></p>
+</div>
+<div class="card">
+<h3>1 · Iniciar sesión</h3>
+<div class="row"><input id="email" type="email" value="dennis.subia@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"></div>
+<div class="row"><input id="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div>
+<div id="authState" class="tag warn">SIN SESIÓN</div>
+<div id="operatorState" class="muted"></div>
+</div>
+<div class="card">
+<h3>2 · Dispositivo</h3>
+<div class="row"><input id="deviceCode" value="SJB-4DCFD8651438417B99B2" placeholder="Código de dispositivo"><button id="checkDevice">VERIFICAR DISPOSITIVO</button></div>
+<div id="deviceState" class="tag warn">NO VERIFICADO</div>
+</div>
+<div class="card">
+<h3>3 · Lector QR</h3>
+<div class="row"><button id="camera" class="alt">INICIAR CÁMARA</button><button id="stopCamera" class="soft">DETENER</button></div>
+<p id="cameraNote" class="muted">La cámara se activa solo al pulsar el botón.</p>
+<video id="video" playsinline muted></video><canvas id="canvas"></canvas>
+</div>
+<div class="card">
+<h3>4 · Entrada manual de contingencia</h3>
+<p class="muted">Permite validar el circuito aunque el navegador no detecte QR por cámara.</p>
+<div class="row"><input id="manualToken" placeholder="Pegue aquí el contenido del QR"><button id="manualCapture">CAPTURAR</button></div>
+</div>
+<div class="card">
+<h3>Estado</h3>
+<div class="row"><span id="queueState" class="tag">COLA: 0</span><span id="syncState" class="tag">SINCRONIZACIÓN</span></div>
+<p id="scanResult">Esperando captura.</p><pre id="diag"></pre>
+</div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
+const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
+const APP_VERSION='github-pages-v14.5';
+const $=id=>document.getElementById(id);
+const state={access:localStorage.getItem('sjb_access')||'',refresh:localStorage.getItem('sjb_refresh')||'',expires:Number(localStorage.getItem('sjb_expires')||0),operator:null,deviceOk:false,stream:null,scanning:false,busy:false,lastValue:'',lastAt:0,detector:null,engine:'none'};
+function diag(v){$('diag').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
+function setAuth(ok,t){$('authState').className='tag '+(ok?'good':'warn');$('authState').textContent=t}
+function setDevice(ok,t){$('deviceState').className='tag '+(ok?'good':'warn');$('deviceState').textContent=t}
+async function parse(r){const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.message||d.msg||d.error_description||d.error||('HTTP '+r.status));return d}
+async function refresh(){if(!state.refresh)return false;if(state.access&&Date.now()<state.expires-60000)return true;try{const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));state.access=d.access_token;state.refresh=d.refresh_token;state.expires=Date.now()+((d.expires_in||3600)*1000);localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires));return true}catch(e){return false}}
+async function rpc(name,body={}){if(!(await refresh()))throw new Error('SESIÓN_REQUERIDA');return parse(await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)}))}
+async function loadContext(){try{const r=await rpc('attendance_my_context');if(!r.authorized)throw new Error(r.reason||'OPERADOR_NO_AUTORIZADO');state.operator=r;setAuth(true,'SESIÓN ACTIVA');$('operatorState').textContent=(r.display_name||'')+' · '+(r.operator_role||'');return true}catch(e){state.operator=null;setAuth(false,'SIN SESIÓN VÁLIDA');$('operatorState').textContent='';diag(e.message);return false}}
+$('login').onclick=async()=>{try{const email=$('email').value.trim(),password=$('password').value;if(!email||!password)return diag('Ingrese correo y contraseña.');$('login').disabled=true;const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})}));state.access=d.access_token;state.refresh=d.refresh_token;state.expires=Date.now()+((d.expires_in||3600)*1000);localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires));$('password').value='';await loadContext();diag({ok:true,mensaje:'Sesión iniciada'})}catch(e){setAuth(false,'ERROR DE ACCESO');diag(e.message)}finally{$('login').disabled=false}};
+$('logout').onclick=()=>{['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));state.access='';state.refresh='';state.expires=0;state.operator=null;state.deviceOk=false;setAuth(false,'SIN SESIÓN');setDevice(false,'NO VERIFICADO');$('operatorState').textContent='';diag('Sesión cerrada.')};
+async function checkDevice(){try{if(!state.operator&&!(await loadContext()))throw new Error('INICIE_SESIÓN');const code=$('deviceCode').value.trim();const r=await rpc('attendance_device_status',{p_device_code:code});if(!r.authorized)throw new Error(r.reason||'DISPOSITIVO_NO_AUTORIZADO');state.deviceOk=true;setDevice(true,'DISPOSITIVO AUTORIZADO');diag(r);return true}catch(e){state.deviceOk=false;setDevice(false,'NO AUTORIZADO');diag(e.message);return false}}
+$('checkDevice').onclick=checkDevice;
+function net(){$('netState').textContent=navigator.onLine?'ONLINE':'OFFLINE';$('netState').className='tag '+(navigator.onLine?'good':'warn')}
+async function chooseEngine(){if('BarcodeDetector'in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes('qr_code')){state.detector=new BarcodeDetector({formats:['qr_code']});state.engine='native';$('engineState').className='tag good';$('engineState').textContent='QR NATIVO';return}}catch(e){}}state.engine='none';$('engineState').className='tag warn';$('engineState').textContent='QR PENDIENTE'}
+$('camera').onclick=async()=>{try{if(!state.deviceOk&&!(await checkDevice()))return;if(!navigator.mediaDevices?.getUserMedia)throw new Error('CÁMARA_NO_DISPONIBLE');state.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('video').srcObject=state.stream;await $('video').play();state.scanning=true;$('cameraNote').textContent='Cámara activa.'}catch(e){$('cameraNote').textContent='No se pudo iniciar la cámara: '+e.message;diag(e.message)}};
+$('stopCamera').onclick=()=>{state.scanning=false;if(state.stream)state.stream.getTracks().forEach(t=>t.stop());state.stream=null;$('video').srcObject=null;$('cameraNote').textContent='Cámara detenida.'};
+(async()=>{$('origin').textContent='Origen: '+location.origin;$('secureState').className='tag '+(window.isSecureContext?'good':'bad');$('secureState').textContent=window.isSecureContext?'HTTPS SEGURO':'NO SEGURO';$('cameraApiState').className='tag '+(navigator.mediaDevices?.getUserMedia?'good':'bad');$('cameraApiState').textContent=navigator.mediaDevices?.getUserMedia?'CÁMARA DISPONIBLE':'SIN API CÁMARA';net();await chooseEngine();if(state.access)await loadContext()})();
+</script>
+</body>
+</html>
