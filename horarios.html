@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6d1f3b">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>ASISTENCIA-QR SJB · Horarios v14.28</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
+*{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
+main{max-width:900px;margin:auto;padding:14px}.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+input,select,button,a.btn{font:inherit;border-radius:10px;padding:11px}input,select{border:1px solid #cbd5e1;min-width:0;flex:1;background:#fff}
+button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;cursor:pointer;text-decoration:none}button:disabled{opacity:.5;cursor:not-allowed}
+.soft{background:#e8edf5;color:#172033}.alt{background:#6d1f3b}.tag{display:inline-block;padding:7px 10px;border-radius:999px;font-weight:800}
+.green{background:#dcfce7;color:#166534}.yellow{background:#fef3c7;color:#92400e}.red{background:#fee2e2;color:#991b1b}.blue{background:#dbeafe;color:#1e3a8a}
+.muted{color:#64748b}.hidden{display:none!important}.schedule{border:1px solid #e2e8f0;border-radius:13px;padding:12px;background:#f8fafc;margin:8px 0}
+.notice{border-left:5px solid #f59e0b;padding-left:12px}pre{white-space:pre-wrap;word-break:break-word;font-size:.82rem}
+</style>
+</head>
+<body>
+<header><b>ASISTENCIA-QR SJB</b><div>Horarios y Puntualidad · v14.28 · RESTORE TEST</div></header>
+<main>
+<div class="card">
+<h3>1 · Sesión administrativa</h3>
+<div class="row"><input id="email" type="email" value="imagen.institucional@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"></div>
+<div class="row"><input id="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div>
+<div class="row"><span id="authState" class="tag yellow">COMPROBANDO…</span></div>
+<p id="operatorText" class="muted"></p>
+</div>
+
+<div class="card hidden" id="mfaCard">
+<h3>2 · MFA administrativo</h3>
+<p class="muted">Abre Google Authenticator en <b>CELULAR 1 o CELULAR 2</b> y usa el código de <b>CEGNE San Juan Bautista</b>.</p>
+<div class="row"><input id="mfaCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="Código MFA"><button id="mfaVerify">VERIFICAR MFA</button></div>
+<p id="mfaText" class="muted"></p>
+</div>
+
+<div class="card hidden" id="formCard">
+<h3>3 · Configurar horario</h3>
+<p class="notice"><b>No se cargan horas automáticamente.</b> “Tardanza desde” es el límite exacto: antes = puntual; desde esa hora = tardanza.</p>
+<div class="grid">
+<select id="combo"></select>
+<label>Ingreso<input id="entry" type="time"></label>
+<label>Tardanza desde<input id="late" type="time"></label>
+<label>Salida<input id="exit" type="time"></label>
+<label>Vigente desde<input id="validFrom" type="date" value="2026-01-01"></label>
+<label>Vigente hasta<input id="validUntil" type="date" value="2026-12-31"></label>
+</div>
+<div class="row"><button id="save" class="alt">GUARDAR HORARIO</button><button id="reload" class="soft">ACTUALIZAR</button></div>
+</div>
+
+<div class="card hidden" id="listCard">
+<h3>4 · Horarios configurados</h3>
+<div id="summary" class="muted"></div>
+<div id="list"></div>
+</div>
+
+<div class="card">
+<div class="row">
+<a class="btn" href="./">LECTOR QR</a>
+<a class="btn" href="./rondas.html?v=14.28">RONDAS</a>
+<a class="btn" href="./movimientos.html?v=14.28">MOVIMIENTOS</a>
+<a class="btn" href="./reconciliacion.html?v=14.23">RECONCILIACIÓN</a>
+</div>
+<pre id="diag"></pre>
+</div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
+const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
+const $=id=>document.getElementById(id);
+const state={
+ access:localStorage.getItem('sjb_access')||'',
+ refresh:localStorage.getItem('sjb_refresh')||'',
+ expires:Number(localStorage.getItem('sjb_expires')||0),
+ operator:null,mfaFactorId:'',combinations:[],schedules:[]
+};
+function diag(v){$('diag').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function saveSession(d){
+ state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;
+ state.expires=Date.now()+((d.expires_in||3600)*1000);
+ localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))
+}
+function clearSession(){['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));state.access='';state.refresh='';state.expires=0}
+async function parse(r){const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.message||d.msg||d.error_description||d.error||('HTTP '+r.status));return d}
+async function refreshSession(force=false){
+ if(!state.refresh)return false;
+ if(!force&&state.access&&Date.now()<state.expires-60000)return true;
+ try{
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));
+  saveSession(d);return true
+ }catch{return false}
+}
+async function rpc(name,body={}){
+ if(!(await refreshSession(false)))throw new Error('SESIÓN_REQUERIDA');
+ let r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ if(r.status===401&&await refreshSession(true))r=await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ return parse(r)
+}
+function jwtPayload(token){try{const p=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const q=p+'='.repeat((4-p.length%4)%4);return JSON.parse(atob(q))}catch{return {}}}
+async function ensureMfa(){
+ const role=state.operator?.operator_role||'';
+ const aal=jwtPayload(state.access).aal||'aal1';
+ if(!['administrator','reconciler'].includes(role)||aal==='aal2'){$('mfaCard').classList.add('hidden');return true}
+ const u=await parse(await fetch(PROJECT_URL+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+state.access}}));
+ const factors=(u.factors||[]).filter(f=>f.status==='verified'&&f.factor_type==='totp');
+ const preferred=factors.find(f=>f.friendly_name==='SJB Institucional - Google Authenticator')||factors[0];
+ if(!preferred)throw new Error('MFA_TOTP_NO_CONFIGURADA');
+ state.mfaFactorId=preferred.id;$('mfaCard').classList.remove('hidden');$('mfaText').textContent='Sesión AAL1 · falta MFA.';return false
+}
+async function load(){
+ try{
+  const loginCtx=await rpc('attendance_operator_login_context');
+  state.operator={operator_id:loginCtx.operator_id,operator_name:loginCtx.operator_name,operator_role:loginCtx.operator_role};
+  $('operatorText').textContent=(loginCtx.operator_name||'')+' · '+(loginCtx.operator_role||'');
+  if(!(await ensureMfa())){$('authState').className='tag yellow';$('authState').textContent='MFA REQUERIDA';return}
+  const d=await rpc('attendance_schedule_admin_context');
+  state.combinations=Array.isArray(d.combinations)?d.combinations:[];
+  state.schedules=Array.isArray(d.schedules)?d.schedules:[];
+  $('authState').className='tag green';$('authState').textContent='SESIÓN ACTIVA · AAL2';
+  $('formCard').classList.remove('hidden');$('listCard').classList.remove('hidden');
+  renderCombo();renderList()
+ }catch(e){$('authState').className='tag red';$('authState').textContent='SIN ACCESO';$('operatorText').textContent=e.message;diag(e.message)}
+}
+function renderCombo(){
+ $('combo').innerHTML=state.combinations.map((x,i)=>'<option value="'+i+'">'+esc(x.campus_name)+' · '+esc(x.level_name)+'</option>').join('')
+}
+function fmtTime(v){return v?String(v).slice(0,5):'—'}
+function renderList(){
+ $('summary').textContent=state.schedules.length?state.schedules.length+' horario(s) configurado(s).':'Aún no hay horarios configurados.';
+ $('list').innerHTML=state.schedules.length?state.schedules.map(s=>'<div class="schedule"><b>'+esc(s.campus_name)+' · '+esc(s.level_name||'Horario general de sede')+'</b><p>Ingreso: <b>'+esc(fmtTime(s.entry_time))+'</b> · Tardanza desde: <b>'+esc(fmtTime(s.late_from))+'</b> · Salida: <b>'+esc(fmtTime(s.exit_time))+'</b></p><p class="muted">Vigencia: '+esc(s.valid_from)+' a '+esc(s.valid_until||'sin fecha final')+' · '+(s.active?'ACTIVO':'INACTIVO')+'</p></div>').join(''):'<p class="muted">El lector seguirá registrando “presente” con puntualidad no configurada hasta que se carguen horarios reales.</p>'
+}
+async function save(){
+ const combo=state.combinations[Number($('combo').value)];
+ if(!combo)return alert('Seleccione sede y nivel.');
+ const entry=$('entry').value,late=$('late').value,exit=$('exit').value;
+ if(!entry||!late)return alert('Ingrese hora de ingreso y hora desde la que cuenta tardanza.');
+ if(late<entry)return alert('“Tardanza desde” no puede ser anterior a la hora de ingreso.');
+ if(exit&&exit<=entry)return alert('La hora de salida debe ser posterior al ingreso.');
+ const vf=$('validFrom').value,vu=$('validUntil').value||null;
+ if(!vf)return alert('Ingrese la fecha de inicio de vigencia.');
+ if(!confirm('¿Guardar este horario real?\n'+combo.campus_name+' · '+combo.level_name+'\nIngreso '+entry+' · Tardanza desde '+late+(exit?' · Salida '+exit:'')))return;
+ try{
+  $('save').disabled=true;
+  const d=await rpc('attendance_admin_set_schedule',{
+   p_campus_id:combo.campus_id,p_level_name:combo.level_name,
+   p_entry_time:entry,p_late_from:late,p_exit_time:exit||null,
+   p_valid_from:vf,p_valid_until:vu
+  });
+  diag(d);await load();alert('Horario guardado correctamente.')
+ }catch(e){alert('No se pudo guardar: '+e.message);diag(e.message)}
+ finally{$('save').disabled=false}
+}
+$('login').onclick=async()=>{
+ try{
+  $('login').disabled=true;
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})}));
+  saveSession(d);$('password').value='';await load()
+ }catch(e){$('authState').className='tag red';$('authState').textContent='ERROR';diag(e.message)}
+ finally{$('login').disabled=false}
+};
+$('logout').onclick=()=>{clearSession();location.reload()};
+$('mfaVerify').onclick=async()=>{
+ const code=$('mfaCode').value.trim();if(!/^\d{6}$/.test(code))return;
+ try{
+  $('mfaVerify').disabled=true;
+  const ch=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(state.mfaFactorId)+'/challenge',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:'{}'}));
+  const v=await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(state.mfaFactorId)+'/verify',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify({challenge_id:ch.id||ch.challenge_id,code})}));
+  saveSession(v.session||v);$('mfaCode').value='';await load()
+ }catch(e){$('mfaText').textContent='No se pudo verificar: '+e.message}
+ finally{$('mfaVerify').disabled=false}
+};
+$('save').onclick=save;$('reload').onclick=load;
+if(state.access||state.refresh)load();else{$('authState').className='tag yellow';$('authState').textContent='INICIA SESIÓN'}
+</script>
+</body>
+</html>
