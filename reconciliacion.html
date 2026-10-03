@@ -12,6 +12,7 @@ main{max-width:900px;margin:auto;padding:14px}.card{background:#fff;border-radiu
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.metric{flex:1;min-width:160px;background:#f8fafc;border-radius:14px;padding:14px}
 .metric b{font-size:1.55rem;display:block}.tag{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:900}
 .green{background:#dcfce7;color:#166534}.yellow{background:#fef3c7;color:#92400e}.red{background:#fee2e2;color:#991b1b}.muted{color:#64748b}
+input{font:inherit;border:1px solid #cbd5e1;border-radius:10px;padding:11px;min-width:0;flex:1}
 button,a.btn{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:#243f68;color:#fff;font-weight:800;text-decoration:none;cursor:pointer}
 button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{font-size:1.25rem;font-weight:900}
 .notice{border-left:5px solid #f59e0b;padding-left:12px}
@@ -20,6 +21,14 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <body>
 <header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · RESTORE TEST</div></header>
 <main>
+<div class="card" id="loginCard">
+<h3>Acceso</h3>
+<p class="muted">Inicia sesión en este dispositivo para consultar la reconciliación.</p>
+<div class="row"><input id="email" type="email" value="dennis.subia@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"></div>
+<div class="row"><input id="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" type="button">CERRAR SESIÓN</button></div>
+<p id="authText" class="muted">Comprobando sesión…</p>
+</div>
+
 <div class="card">
 <div class="row"><span id="status" class="tag yellow">COMPROBANDO…</span><span id="dateText"></span></div>
 <p id="summary" class="muted">Leyendo estado institucional.</p>
@@ -72,6 +81,10 @@ function saveSession(d){
  state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;
  state.expires=Date.now()+((d.expires_in||3600)*1000);
  localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))
+}
+function clearSession(){
+ ['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));
+ state.access='';state.refresh='';state.expires=0;
 }
 async function parse(r){
  const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}
@@ -127,13 +140,40 @@ async function load(){
  try{
   $('refresh').disabled=true;
   const r=await rpc('attendance_reconciliation_status',{});
+  $('authText').textContent='SESIÓN ACTIVA';
   render(r)
  }catch(e){
   $('status').className='tag red';$('status').textContent='SIN SESIÓN / ERROR';
   $('summary').textContent=e.message;
-  $('diag').textContent=e.message
+  $('diag').textContent=e.message;
+  $('authText').textContent=e.message==='SESIÓN_REQUERIDA'?'Inicia sesión para continuar.':'No se pudo validar la sesión.'
  }finally{$('refresh').disabled=false}
 }
+$('login').onclick=async()=>{
+ try{
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password){$('authText').textContent='Ingrese correo y contraseña.';return}
+  $('login').disabled=true;$('authText').textContent='Ingresando…';
+  const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{
+   method:'POST',
+   headers:{apikey:KEY,'Content-Type':'application/json'},
+   body:JSON.stringify({email,password})
+  }));
+  saveSession(d);$('password').value='';$('authText').textContent='SESIÓN ACTIVA';
+  await load()
+ }catch(e){
+  $('authText').textContent='No se pudo iniciar sesión: '+e.message
+ }finally{$('login').disabled=false}
+};
+$('logout').onclick=()=>{
+ clearSession();
+ $('authText').textContent='Sesión cerrada.';
+ $('status').className='tag red';$('status').textContent='SIN SESIÓN';
+ ['expected','marked','unverified','absent','pending','offline','stale','errors'].forEach(id=>$(id).textContent='—');
+ $('summary').textContent='Inicia sesión para consultar la jornada.';
+ $('operator').textContent='Sin sesión activa.';
+ $('diag').textContent='';
+};
 $('refresh').onclick=load;
 load();
 </script>
