@@ -1,5 +1,5 @@
-const CACHE='sjb-reader-v14.23';
-const SHELL=['./','./index.html','./manifest.webmanifest','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html'];
+const CACHE='sjb-reader-v14.24';
+const SHELL=['./','./index.html','./manifest.webmanifest','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html','./rondas.html'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
