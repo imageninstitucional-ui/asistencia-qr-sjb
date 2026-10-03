@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#6d1f3b">
-<title>ASISTENCIA-QR SJB · Reconciliación v14.16</title>
+<title>ASISTENCIA-QR SJB · Reconciliación v14.18</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:white}
@@ -25,7 +25,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.16 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.18 · RESTORE TEST</div></header>
 <main>
 <div class="card" id="loginCard">
 <h3>Acceso</h3>
@@ -76,6 +76,16 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <h3 id="detailTitle">Estudiantes sin verificar</h3>
 <p id="detailNote" class="muted"></p>
 <div id="detailList" class="detail-list"></div>
+</div>
+
+<div class="card">
+<h3>Pre-cierre seguro</h3>
+<p class="muted">Simula el cierre sin modificar la jornada. Sirve para detectar exactamente qué impide cerrar.</p>
+<div class="row">
+ <button id="precloseBtn" type="button">SIMULAR PRE-CIERRE</button>
+ <span id="precloseState" class="tag yellow">SIN SIMULAR</span>
+</div>
+<p id="precloseText" class="muted">Ejecuta la simulación para comprobar las condiciones de cierre.</p>
 </div>
 
 <div class="card">
@@ -271,6 +281,68 @@ async function loadDetail(sectionId){
   $('detailList').innerHTML=''
  }
 }
+function reasonLabel(code){
+ const labels={
+  'SEMÁFORO_NO_VERDE':'Semáforo aún no está verde',
+  'ESTUDIANTES_SIN_VERIFICAR':'Hay estudiantes sin verificar',
+  'EVENTOS_PENDIENTES':'Hay eventos pendientes de sincronizar',
+  'DISPOSITIVOS_OFFLINE':'Hay dispositivos offline',
+  'DISPOSITIVOS_SIN_HEARTBEAT':'Hay dispositivos sin heartbeat reciente',
+  'ERRORES_DE_DISPOSITIVO':'Hay errores de dispositivo',
+  'INCONSISTENCIAS':'Hay inconsistencias que resolver',
+  'ROL_SIN_PERMISO_DE_CIERRE':'Tu rol no tiene permiso para cerrar la jornada'
+ };
+ return labels[code]||code
+}
+async function runPreclose(){
+ try{
+  $('precloseBtn').disabled=true;
+  $('precloseState').className='tag yellow';$('precloseState').textContent='COMPROBANDO…';
+  const r=await rpc('attendance_preclose_status',{p_date:state.currentDate||null});
+  const reasons=Array.isArray(r.close_reasons)?r.close_reasons:[];
+  if(r.can_close){
+   $('precloseState').className='tag green';$('precloseState').textContent='LISTO PARA CERRAR';
+   $('precloseText').textContent='Todas las comprobaciones pasaron. El cierre real está habilitado para este rol.';
+   $('closeBtn').disabled=false;
+  }else{
+   $('precloseState').className='tag yellow';$('precloseState').textContent='PRE-CIERRE BLOQUEADO';
+   $('precloseText').textContent=reasons.length
+    ? reasons.map(reasonLabel).join(' · ')
+    : 'La jornada todavía no cumple las condiciones de cierre.';
+   $('closeBtn').disabled=true;
+  }
+  $('diag').textContent=JSON.stringify({
+   status:r.status,
+   can_close:r.can_close,
+   role_allowed_to_close:r.role_allowed_to_close,
+   close_reasons:reasons,
+   unverified_students:r.unverified_students,
+   pending_events:r.pending_events,
+   offline_devices:r.offline_devices,
+   stale_devices:r.stale_devices,
+   device_errors:r.device_errors,
+   inconsistencies:r.inconsistencies
+  },null,2);
+ }catch(e){
+  $('precloseState').className='tag red';$('precloseState').textContent='ERROR';
+  $('precloseText').textContent=e.message;
+  $('closeBtn').disabled=true;
+ }finally{$('precloseBtn').disabled=false}
+}
+async function closeDay(){
+ if($('closeBtn').disabled)return;
+ if(!confirm('¿Confirmar cierre definitivo de la jornada? Esta acción solo debe ejecutarse cuando el semáforo esté VERDE.'))return;
+ try{
+  $('closeBtn').disabled=true;$('closeBtn').textContent='CERRANDO…';
+  const r=await rpc('attendance_close_day',{p_date:state.currentDate||null});
+  $('precloseState').className='tag green';$('precloseState').textContent='JORNADA CERRADA';
+  $('precloseText').textContent='Cierre realizado por '+(r.closed_by||'operador autorizado')+'. Mensajería habilitada.';
+  await load();
+ }catch(e){
+  $('precloseState').className='tag red';$('precloseState').textContent='CIERRE BLOQUEADO';
+  $('precloseText').textContent=e.message;
+ }finally{$('closeBtn').textContent='CERRAR ASISTENCIA'}
+}
 async function load(){
  try{
   $('refresh').disabled=true;
@@ -334,6 +406,8 @@ $('logout').onclick=()=>{
  $('detailCard').style.display='none';
 };
 $('refresh').onclick=load;
+$('precloseBtn').onclick=runPreclose;
+$('closeBtn').onclick=closeDay;
 $('levelFilter').onchange=renderSections;
 $('pendingOnly').onchange=renderSections;
 load();
