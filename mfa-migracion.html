@@ -46,6 +46,15 @@ button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{fo
 <p id="oldText" class="muted"></p>
 </div>
 
+<div class="card" id="pendingCard" style="display:none">
+<div class="step">PASO 3A · EN LA PC</div>
+<h3>Factor incompleto detectado</h3>
+<p class="notice">Existe un factor nuevo que quedó creado pero no verificado. Para evitar duplicados, primero lo cancelaremos y luego generaremos uno nuevo con QR visible.</p>
+<div id="pendingFactorText" class="muted"></div>
+<button id="removePending" type="button" class="danger">CANCELAR FACTOR INCOMPLETO</button>
+<p id="pendingText" class="muted"></p>
+</div>
+
 <div class="card" id="enrollCard" style="display:none">
 <div class="step">PASO 3 · EN LA PC</div>
 <h3>Crear nuevo factor</h3>
@@ -89,8 +98,9 @@ const state={
  refresh:localStorage.getItem('sjb_refresh')||'',
  expires:Number(localStorage.getItem('sjb_expires')||0),
  oldFactorId:'',
- newFactorId:'',
- newQr:''
+ newFactorId:sessionStorage.getItem('sjb_mfa_new_factor_id')||'',
+ newQr:sessionStorage.getItem('sjb_mfa_new_qr')||'',
+ pendingFactorId:''
 };
 function saveSession(d){
  state.access=d.access_token||'';
@@ -133,6 +143,7 @@ async function inspect(){
   const u=await user();
   const factors=Array.isArray(u.factors)?u.factors:[];
   const verified=factors.filter(f=>f.status==='verified'&&f.factor_type==='totp');
+  const pending=factors.find(f=>f.status==='unverified'&&f.factor_type==='totp'&&f.friendly_name==='SJB Institucional - Google Authenticator');
   const payload=jwtPayload(state.access);
   $('sessionState').className='tag green';
   $('sessionState').textContent='SESIÓN ACTIVA · '+String(payload.aal||'aal1').toUpperCase();
@@ -140,14 +151,30 @@ async function inspect(){
   $('loginCard').style.display='none';
   if(payload.aal==='aal2'){
     $('oldMfaCard').style.display='none';
-    $('enrollCard').style.display='block'
+    if(state.newFactorId&&state.newQr){
+      $('pendingCard').style.display='none';
+      $('enrollCard').style.display='none';
+      $('qr').src=state.newQr;
+      $('qrCard').style.display='block';
+      $('newVerifyCard').style.display='block';
+    }else if(pending){
+      state.pendingFactorId=pending.id;
+      $('pendingFactorText').textContent='Factor pendiente: '+(pending.friendly_name||'TOTP')+' · estado: '+pending.status;
+      $('pendingCard').style.display='block';
+      $('enrollCard').style.display='none';
+    }else{
+      $('pendingCard').style.display='none';
+      $('enrollCard').style.display='block'
+    }
   }else if(verified.length){
     state.oldFactorId=verified[0].id;
     $('oldFactorText').textContent='Factor actual: '+(verified[0].friendly_name||'TOTP existente');
     $('oldMfaCard').style.display='block';
+    $('pendingCard').style.display='none';
     $('enrollCard').style.display='none'
   }else{
     $('oldMfaCard').style.display='none';
+    $('pendingCard').style.display='none';
     $('enrollCard').style.display='block'
   }
  }catch(e){
@@ -191,6 +218,26 @@ $('verifyOld').onclick=async()=>{
  }catch(e){$('oldText').textContent='No se pudo validar: '+e.message}
  finally{$('verifyOld').disabled=false}
 };
+$('removePending').onclick=async()=>{
+ if(!state.pendingFactorId){$('pendingText').textContent='No hay factor pendiente identificado.';return}
+ if(!confirm('¿Cancelar únicamente el factor incompleto NO VERIFICADO para volver a generar el QR? El factor MFA antiguo verificado NO se eliminará.'))return;
+ try{
+  $('removePending').disabled=true;$('pendingText').textContent='Cancelando factor incompleto…';
+  await parse(await fetch(PROJECT_URL+'/auth/v1/factors/'+encodeURIComponent(state.pendingFactorId),{
+   method:'DELETE',
+   headers:{apikey:KEY,Authorization:'Bearer '+state.access}
+  }));
+  state.pendingFactorId='';
+  sessionStorage.removeItem('sjb_mfa_new_factor_id');
+  sessionStorage.removeItem('sjb_mfa_new_qr');
+  state.newFactorId='';state.newQr='';
+  $('pendingText').textContent='Factor incompleto cancelado. El MFA antiguo sigue intacto.';
+  $('pendingCard').style.display='none';
+  $('enrollCard').style.display='block';
+ }catch(e){$('pendingText').textContent='No se pudo cancelar: '+e.message}
+ finally{$('removePending').disabled=false}
+};
+
 $('createFactor').onclick=async()=>{
  try{
   $('createFactor').disabled=true;$('createText').textContent='Creando nuevo factor…';
@@ -202,8 +249,13 @@ $('createFactor').onclick=async()=>{
   }));
   if(!d.id||!d.totp)throw new Error('RESPUESTA_TOTP_INCOMPLETA');
   state.newFactorId=d.id;
-  state.newQr=d.totp.qr_code||d.totp.qrCode||'';
-  if(!state.newQr)throw new Error('QR_NO_RECIBIDO');
+  const rawQr=d.totp.qr_code||d.totp.qrCode||'';
+  if(!rawQr)throw new Error('QR_NO_RECIBIDO');
+  state.newQr=rawQr.startsWith('data:image/')
+    ? rawQr
+    : 'data:image/svg+xml;utf-8,'+encodeURIComponent(rawQr);
+  sessionStorage.setItem('sjb_mfa_new_factor_id',state.newFactorId);
+  sessionStorage.setItem('sjb_mfa_new_qr',state.newQr);
   $('qr').src=state.newQr;
   $('createText').textContent='Nuevo factor creado en estado NO VERIFICADO. El factor antiguo sigue intacto.';
   $('qrCard').style.display='block';
@@ -233,6 +285,8 @@ $('verifyNew').onclick=async()=>{
   const current=factors.find(f=>f.id===state.newFactorId);
   if(!current||current.status!=='verified')throw new Error('FACTOR_NO_QUEDÓ_VERIFICADO');
   $('newText').textContent='NUEVO FACTOR VERIFICADO CORRECTAMENTE.';
+  sessionStorage.removeItem('sjb_mfa_new_factor_id');
+  sessionStorage.removeItem('sjb_mfa_new_qr');
   $('factors').innerHTML=factors.map(f=>'<div class="factor"><b>'+String(f.friendly_name||'TOTP').replace(/[<>&"]/g,'')+'</b><br>Estado: '+String(f.status||'')+(f.id===state.newFactorId?' · <b>NUEVO GOOGLE AUTHENTICATOR</b>':' · factor anterior')+'</div>').join('');
   $('doneCard').style.display='block';
   $('doneCard').scrollIntoView({behavior:'smooth',block:'start'})
