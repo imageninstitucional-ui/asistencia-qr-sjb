@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#6d1f3b"><title>ASISTENCIA-QR SJB · Módulos v14.37</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#1f2937;background:#eef1f5;--g:#6f1d3b;--b:#28476f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(111,29,59,.08),transparent 28%),radial-gradient(circle at 92% 8%,rgba(40,71,111,.10),transparent 30%),#eef1f5}
+header{padding:24px 20px;background:linear-gradient(120deg,var(--g),#54213a 50%,var(--b));color:white}
+nav{max-width:1100px;margin:14px auto 0;padding:0 14px;display:flex;gap:8px;flex-wrap:wrap}
+nav a{padding:9px 12px;border-radius:999px;text-decoration:none;background:#fff;color:#344054;font-weight:800;font-size:.88rem}
+main{max-width:1180px;margin:auto;padding:14px}.card{background:#fffffff2;border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 14px 35px rgba(34,45,70,.08)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}
+input,select,button{font:inherit;padding:10px;border-radius:12px}input,select{border:1px solid #d8dee8}button{border:0;background:var(--b);color:#fff;font-weight:800;cursor:pointer}.soft{background:#e8edf5;color:#172033}.alt{background:var(--g)}
+.panel{border:1px solid #e4e8ef;border-radius:16px;padding:13px;background:linear-gradient(#fff,#f8fafc)}
+.module{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef2f6}.module:last-child{border-bottom:0}
+.switch{width:22px;height:22px}.muted{color:#64748b}.tag{font-size:.75rem;font-weight:900;padding:5px 8px;border-radius:999px}.role{background:#e0e7ff;color:#3730a3}.ind{background:#fce7f3;color:#9d174d}.hidden{display:none!important}
+</style></head>
+<body>
+<header><b style="font-size:1.28rem">ASISTENCIA-QR SJB</b><div>Módulos y permisos · v14.37 · RESTORE TEST</div></header>
+<nav><a href="./">⌂ Lector</a><a href="./rondas.html?v=14.37">✓ Rondas</a><a href="./avisos.html?v=14.37">✉ Avisos</a><a href="./carnets.html?v=14.37">▦ Carnés / QR</a></nav>
+<main>
+<div class="card"><h3>1 · Sesión</h3><div class="row"><input id="email" type="email" value="imagen.institucional@cegnesanjuanbautista.edu.pe"><input id="password" type="password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div><p id="auth" class="muted"></p></div>
+<div class="card hidden" id="roleCard"><h3>2 · Módulos predeterminados por rol</h3><p class="muted">Lo marcado aquí se aplica por defecto a todos los operadores de ese rol.</p><div id="roles" class="grid"></div></div>
+<div class="card hidden" id="personCard"><h3>3 · Excepciones por persona</h3><div class="row"><input id="search" placeholder="Autobúsqueda por nombre"><select id="roleFilter"><option value="">Todos los roles</option></select></div><p class="muted">Un check individual reemplaza el valor del rol solo para esa persona. Usa “Volver al rol” para eliminar la excepción.</p><div id="people" class="grid"></div></div>
+<div class="card"><pre id="diag"></pre></div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co',KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa',$=id=>document.getElementById(id);
+const state={access:localStorage.getItem('sjb_access')||'',refresh:localStorage.getItem('sjb_refresh')||'',expires:Number(localStorage.getItem('sjb_expires')||0),roles:[],ops:[],mods:[]};
+function save(d){state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;state.expires=Date.now()+((d.expires_in||3600)*1000);localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))}
+function clear(){['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));state.access='';state.refresh='';state.expires=0}
+async function parse(r){const t=await r.text();let d={};try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.message||d.error||d.raw||('HTTP '+r.status));return d}
+async function refresh(){if(state.access&&Date.now()<state.expires-60000)return true;if(!state.refresh)return false;try{const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));save(d);return true}catch{return false}}
+async function rpc(name,body={}){if(!(await refresh()))throw new Error('SESIÓN_REQUERIDA');return parse(await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)}))}
+function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+async function load(){try{
+ const [rm,pm]=await Promise.all([rpc('attendance_role_module_matrix'),rpc('attendance_module_admin_matrix')]);
+ state.roles=rm.matrix?.roles||[];state.mods=pm.matrix?.modules||[];state.ops=pm.matrix?.operators||[];
+ $('roleCard').classList.remove('hidden');$('personCard').classList.remove('hidden');$('auth').textContent='Sesión activa';renderRoles();fillRoleFilter();renderPeople();
+}catch(e){$('auth').textContent='Sin acceso';$('diag').textContent=e.message}}
+function renderRoles(){$('roles').innerHTML=state.roles.map(r=>'<div class="panel"><h4>'+esc(r.role)+'</h4>'+r.modules.map(m=>'<label class="module"><span>'+esc(m.name)+(m.sensitive?' <span class="tag ind">SENSIBLE</span>':'')+'</span><input class="switch roleChk" type="checkbox" data-role="'+esc(r.role)+'" data-code="'+esc(m.code)+'" '+(m.allowed?'checked':'')+'></label>').join('')+'</div>').join('');document.querySelectorAll('.roleChk').forEach(x=>x.onchange=async()=>{try{await rpc('attendance_set_role_module',{p_operator_role:x.dataset.role,p_module_code:x.dataset.code,p_allowed:x.checked});await load()}catch(e){alert(e.message);x.checked=!x.checked}})}
+function fillRoleFilter(){const roles=[...new Set(state.ops.map(x=>x.role))];$('roleFilter').innerHTML='<option value="">Todos los roles</option>'+roles.map(r=>'<option>'+esc(r)+'</option>').join('')}
+function renderPeople(){const q=$('search').value.trim().toLowerCase(),rf=$('roleFilter').value;const arr=state.ops.filter(o=>(!q||String(o.display_name).toLowerCase().includes(q))&&(!rf||o.role===rf));$('people').innerHTML=arr.map(o=>'<div class="panel"><h4>'+esc(o.display_name)+'</h4><div class="muted">'+esc(o.role)+' · '+esc(o.activation_status)+'</div>'+o.modules.map(m=>'<div class="module"><label><input class="switch personChk" type="checkbox" data-op="'+esc(o.operator_id)+'" data-code="'+esc(m.code)+'" '+(m.allowed?'checked':'')+'> '+esc(state.mods.find(x=>x.code===m.code)?.name||m.code)+'</label><span><span class="tag '+(m.source==='individual'?'ind':'role')+'">'+esc(m.source==='individual'?'INDIVIDUAL':m.source==='role'?'ROL':'SIN ASIGNAR')+'</span> '+(m.source==='individual'?'<button class="soft resetBtn" data-op="'+esc(o.operator_id)+'" data-code="'+esc(m.code)+'">Volver al rol</button>':'')+'</span></div>').join('')+'</div>').join('');
+ document.querySelectorAll('.personChk').forEach(x=>x.onchange=async()=>{try{await rpc('attendance_set_operator_module',{p_operator_id:x.dataset.op,p_module_code:x.dataset.code,p_allowed:x.checked,p_use_role_default:false});await load()}catch(e){alert(e.message);x.checked=!x.checked}});
+ document.querySelectorAll('.resetBtn').forEach(x=>x.onclick=async()=>{try{await rpc('attendance_set_operator_module',{p_operator_id:x.dataset.op,p_module_code:x.dataset.code,p_allowed:false,p_use_role_default:true});await load()}catch(e){alert(e.message)}})
+}
+$('search').oninput=renderPeople;$('roleFilter').onchange=renderPeople;
+$('login').onclick=async()=>{try{const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})}));save(d);$('password').value='';await load()}catch(e){$('auth').textContent=e.message}};
+$('logout').onclick=()=>{clear();location.reload()};if(state.access||state.refresh)load();
+</script></body></html>
