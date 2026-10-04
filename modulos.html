@@ -15,8 +15,17 @@ input,select,button{font:inherit;padding:10px;border-radius:12px}input,select{bo
 .panel{border:1px solid #e4e8ef;border-radius:16px;padding:13px;background:linear-gradient(#fff,#f8fafc)}
 .module{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef2f6}.module:last-child{border-bottom:0}
 .switch{width:22px;height:22px}.muted{color:#64748b}.tag{font-size:.75rem;font-weight:900;padding:5px 8px;border-radius:999px}.role{background:#e0e7ff;color:#3730a3}.ind{background:#fce7f3;color:#9d174d}.hidden{display:none!important}
+
+.back-scanner{
+ position:fixed;left:10px;top:10px;z-index:120;display:inline-flex;align-items:center;gap:6px;
+ padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.94);color:#6f1d3b;
+ text-decoration:none;font-weight:900;font-size:.82rem;box-shadow:0 6px 18px rgba(0,0,0,.14);
+ border:1px solid rgba(111,29,59,.12);backdrop-filter:blur(8px)
+}
+@media(max-width:640px){.back-scanner span{display:none}.back-scanner{width:38px;height:38px;justify-content:center;padding:0;font-size:1.15rem}}
 </style></head>
 <body>
+<a class="back-scanner" href="./" aria-label="Volver al escáner">← <span>Escáner</span></a>
 <header><b style="font-size:1.28rem">ASISTENCIA-QR SJB</b><div>Módulos y permisos · v14.37 · RESTORE TEST</div></header>
 <nav><a href="./">⌂ Lector</a><a href="./rondas.html?v=14.37">✓ Rondas</a><a href="./avisos.html?v=14.37">✉ Avisos</a><a href="./carnets.html?v=14.37">▦ Carnés / QR</a></nav>
 <main>
