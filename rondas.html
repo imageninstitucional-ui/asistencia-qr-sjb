@@ -49,9 +49,18 @@ input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shado
 .sjb-subtitle{opacity:.9;font-size:.92rem;margin-top:3px}
 @media(max-width:640px){header{padding:20px 16px!important}.sjb-topnav{padding:0 10px}.sjb-topnav a{font-size:.8rem;padding:8px 10px}.card{border-radius:17px!important}}
 
+
+.back-scanner{
+ position:fixed;left:10px;top:10px;z-index:120;display:inline-flex;align-items:center;gap:6px;
+ padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.94);color:#6f1d3b;
+ text-decoration:none;font-weight:900;font-size:.82rem;box-shadow:0 6px 18px rgba(0,0,0,.14);
+ border:1px solid rgba(111,29,59,.12);backdrop-filter:blur(8px)
+}
+@media(max-width:640px){.back-scanner span{display:none}.back-scanner{width:38px;height:38px;justify-content:center;padding:0;font-size:1.15rem}}
 </style>
 </head>
 <body>
+<a class="back-scanner" href="./" aria-label="Volver al escáner">← <span>Escáner</span></a>
 <header><div class="big">ASISTENCIA-QR SJB</div><div>Rondas de permanencia · v14.37 · RESTORE TEST</div></header>
 <nav class="sjb-topnav">
 <a data-module="reader" href="./">⌂ Lector</a>
