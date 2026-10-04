@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>ASISTENCIA-QR SJB · Piloto v14.37</title>
+<title>ASISTENCIA-QR SJB · Piloto v14.38</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -20,7 +20,7 @@ button:disabled{opacity:.55;cursor:not-allowed}button.alt{background:#6d1f3b}but
 video{width:100%;max-height:58vh;background:#111;border-radius:12px}canvas{display:none}pre{white-space:pre-wrap;word-break:break-word;font-size:.82rem}
 #scanResult{font-size:1.05rem;font-weight:750}.big{font-size:1.22rem;font-weight:850}
 
-/* CONECTA SAN JUAN · línea gráfica unificada v14.37 */
+/* CONECTA SAN JUAN · línea gráfica unificada v14.38 */
 :root{
  --sjb-guinda:#6f1d3b;--sjb-guinda2:#8a294f;--sjb-azul:#28476f;--sjb-crema:#fff8ea;
  --sjb-fondo:#eef1f5;--sjb-texto:#1f2937;--sjb-borde:#e4e8ef;--sjb-sombra:0 14px 35px rgba(34,45,70,.08)
@@ -47,10 +47,56 @@ input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shado
 .sjb-subtitle{opacity:.9;font-size:.92rem;margin-top:3px}
 @media(max-width:640px){header{padding:20px 16px!important}.sjb-topnav{padding:0 10px}.sjb-topnav a{font-size:.8rem;padding:8px 10px}.card{border-radius:17px!important}}
 
+
+/* MODO MÓVIL COMPACTO v14.38 */
+.mobile-flow{display:none}
+@media(max-width:640px){
+ body{padding-bottom:76px}
+ header{padding:15px 14px!important}
+ header .big{font-size:1.05rem!important}
+ header>div:last-child{font-size:.78rem;opacity:.9}
+ .sjb-topnav{display:none!important}
+ main{padding:8px!important}
+ .card{margin:7px 0!important;padding:11px!important;border-radius:15px!important}
+ .card h3{font-size:.9rem;margin:0 0 8px!important}
+ .row{gap:6px!important}
+ input,button,select{padding:9px!important;font-size:.9rem!important}
+ button{min-height:38px}
+ .muted{font-size:.78rem!important}
+ .tag{font-size:.72rem!important;padding:5px 7px!important}
+ video{max-height:48vh!important;border-radius:14px!important}
+ #scanResult{font-size:.96rem!important;margin:8px 0!important}
+ pre{font-size:.7rem!important}
+ .mobile-flow{
+   display:block;position:sticky;top:0;z-index:50;background:rgba(238,241,245,.96);
+   backdrop-filter:blur(10px);padding:8px 0 7px;margin:0 -8px 7px;overflow:hidden;border-bottom:1px solid #dde3ea
+ }
+ .mobile-flow-track{
+   display:flex;gap:8px;overflow-x:auto;padding:0 10px 5px;scrollbar-width:none;scroll-snap-type:x proximity
+ }
+ .mobile-flow-track::-webkit-scrollbar{display:none}
+ .flow-step{
+   flex:0 0 auto;min-width:112px;padding:8px 10px;border-radius:999px;background:#fff;border:1px solid #dfe5ec;
+   color:#667085;font-weight:850;font-size:.76rem;text-align:center;scroll-snap-align:center;transition:.2s
+ }
+ .flow-step.active{background:linear-gradient(120deg,#6f1d3b,#28476f);color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(58,44,78,.18)}
+ .flow-step.done{background:#e8f7ee;color:#166534;border-color:#ccebd7}
+ .mobile-bottom{
+   display:flex!important;position:fixed;left:8px;right:8px;bottom:8px;z-index:70;
+   background:rgba(255,255,255,.96);border:1px solid #e1e6ed;border-radius:18px;padding:7px;
+   box-shadow:0 12px 28px rgba(31,41,55,.18);backdrop-filter:blur(12px);justify-content:space-around
+ }
+ .mobile-bottom a{display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:#475467;font-size:.67rem;font-weight:800;padding:5px 7px;border-radius:12px}
+ .mobile-bottom a.current{background:#f3e8ee;color:#6f1d3b}
+ .mobile-hide-secondary{display:none!important}
+ .mobile-compact-state{padding:9px!important}
+}
+@media(min-width:641px){.mobile-bottom{display:none!important}}
+
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector institucional · v14.37 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Lector institucional · v14.38 · RESTORE TEST</div></header>
 <nav class="sjb-topnav">
 <a data-module="reader" href="./">⌂ Lector</a>
 <a data-module="rounds" href="./rondas.html?v=14.37">✓ Rondas</a>
@@ -62,6 +108,14 @@ input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shado
 <a data-admin="1" href="./modulos.html?v=14.37">⚙ Módulos</a>
 </nav>
 <main>
+<div class="mobile-flow" id="mobileFlow">
+  <div class="mobile-flow-track" id="mobileFlowTrack">
+    <div class="flow-step active" data-step="login">1 · Acceso</div>
+    <div class="flow-step" data-step="device">2 · Dispositivo</div>
+    <div class="flow-step" data-step="scan">3 · Escanear QR</div>
+    <div class="flow-step" data-step="confirm">4 · Confirmación</div>
+  </div>
+</div>
 <div class="card">
 <h3>0 · Diagnóstico</h3>
 <div class="row"><span id="secureState" class="tag">HTTPS</span><span id="cameraApiState" class="tag">CÁMARA</span><span id="engineState" class="tag">QR</span><span id="netState" class="tag">RED</span><span id="heartbeatState" class="tag">HEARTBEAT</span><span id="pwaState" class="tag">PWA</span></div>
@@ -129,7 +183,7 @@ input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shado
 <script>
 const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co';
 const KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa';
-const APP_VERSION='github-pages-v14.37';
+const APP_VERSION='github-pages-v14.38';
 const OFFLINE_LEASE_KEY='sjb_offline_lease_v1';
 const DEVICE_CODE_KEY='sjb_device_code_v1';
 const OFFLINE_LEASE_MS=12*60*60*1000;
@@ -547,6 +601,45 @@ $('camera').onclick=startCamera;$('stopCamera').onclick=stopCamera;
     document.querySelectorAll('main').forEach(x=>x.innerHTML='<div class="card"><h3>ACCESO NO ASIGNADO</h3><p>Este módulo no está habilitado para tu rol o usuario.</p><a class="btn" href="./">VOLVER</a></div>');
   }
  }catch(e){}
+})();
+</script>
+<div class="mobile-bottom">
+<a class="current" href="./"><span>▣</span><span>Lector</span></a>
+<a data-module="rounds" href="./rondas.html?v=14.38"><span>✓</span><span>Rondas</span></a>
+<a data-module="movements" href="./movimientos.html?v=14.38"><span>↔</span><span>Movim.</span></a>
+<a data-module="notifications" href="./avisos.html?v=14.38"><span>✉</span><span>Avisos</span></a>
+</div>
+<script>
+(function(){
+ const mainCards=[...document.querySelectorAll('main>.card')];
+ mainCards.forEach(card=>{
+   const h=(card.querySelector('h3')?.textContent||'').toLowerCase();
+   if(h.includes('diagnóstico')) card.classList.add('mobile-hide-secondary');
+   if(h.includes('rondas de permanencia')||h.includes('movimientos de estudiantes')||h.includes('horarios y puntualidad')||h.includes('reconciliación')) card.classList.add('mobile-hide-secondary');
+   if(h==='estado') card.classList.add('mobile-compact-state');
+ });
+ const steps=[...document.querySelectorAll('.flow-step')];
+ function setStep(name){
+   const order=['login','device','scan','confirm']; const idx=order.indexOf(name);
+   steps.forEach((s,i)=>{s.classList.toggle('active',i===idx);s.classList.toggle('done',i<idx)});
+   const el=steps[idx]; if(el) el.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+ }
+ function infer(){
+   const auth=(document.getElementById('authState')?.textContent||'').toUpperCase();
+   const dev=(document.getElementById('deviceState')?.textContent||'').toUpperCase();
+   const result=(document.getElementById('scanResult')?.textContent||'').toUpperCase();
+   if(result && !result.includes('ESPERANDO CAPTURA')) return setStep('confirm');
+   if(dev.includes('ACTIV')||dev.includes('VERIFIC')||dev.includes('AUTORIZ')) return setStep('scan');
+   if(auth.includes('ACTIVA')||auth.includes('OFFLINE')) return setStep('device');
+   setStep('login');
+ }
+ ['authState','deviceState','scanResult'].forEach(id=>{const el=document.getElementById(id);if(el)new MutationObserver(infer).observe(el,{childList:true,subtree:true,characterData:true})});
+ steps.forEach(s=>s.onclick=()=>{
+   const map={login:'1 · Iniciar sesión',device:'2 · Dispositivo',scan:'3 · Lector QR',confirm:'Estado'};
+   const target=mainCards.find(card=>(card.querySelector('h3')?.textContent||'').includes(map[s.dataset.step]||''));
+   if(target) target.scrollIntoView({behavior:'smooth',block:'start'});
+ });
+ infer();
 })();
 </script>
 </body>
