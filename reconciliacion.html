@@ -22,9 +22,18 @@ input,select{font:inherit;border:1px solid #cbd5e1;border-radius:10px;padding:11
 button,a.btn{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:#243f68;color:#fff;font-weight:800;text-decoration:none;cursor:pointer}
 button:disabled{opacity:.5;cursor:not-allowed}.danger{background:#991b1b}.big{font-size:1.25rem;font-weight:900}
 .notice{border-left:5px solid #f59e0b;padding-left:12px}
+
+.back-scanner{
+ position:fixed;left:10px;top:10px;z-index:120;display:inline-flex;align-items:center;gap:6px;
+ padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.94);color:#6f1d3b;
+ text-decoration:none;font-weight:900;font-size:.82rem;box-shadow:0 6px 18px rgba(0,0,0,.14);
+ border:1px solid rgba(111,29,59,.12);backdrop-filter:blur(8px)
+}
+@media(max-width:640px){.back-scanner span{display:none}.back-scanner{width:38px;height:38px;justify-content:center;padding:0;font-size:1.15rem}}
 </style>
 </head>
 <body>
+<a class="back-scanner" href="./" aria-label="Volver al escáner">← <span>Escáner</span></a>
 <header><div class="big">ASISTENCIA-QR SJB</div><div>Reconciliación y cierre seguro · v14.23 · RESTORE TEST</div></header>
 <main>
 <div class="card" id="loginCard">
