@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#6d1f3b"><title>ASISTENCIA-QR SJB · Carnés v14.36</title>
+<meta name="theme-color" content="#6d1f3b"><title>ASISTENCIA-QR SJB · Carnés v14.37</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}*{box-sizing:border-box}body{margin:0}
@@ -18,7 +18,7 @@ button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;text-decorat
 .print-card canvas{margin:10px auto}.print-card .name{font-size:1.05rem;font-weight:900}.print-card .small{font-size:.86rem;color:#475569}
 @media print{body{background:#fff}header,.no-print,#searchCard,#resultsCard{display:none!important}main{max-width:none;padding:0}.card{box-shadow:none;border:0}.cards{grid-template-columns:repeat(2,1fr);gap:10mm}.print-card{height:82mm;padding:8mm}}
 
-/* CONECTA SAN JUAN · línea gráfica unificada v14.36 */
+/* CONECTA SAN JUAN · línea gráfica unificada v14.37 */
 :root{
  --sjb-guinda:#6f1d3b;--sjb-guinda2:#8a294f;--sjb-azul:#28476f;--sjb-crema:#fff8ea;
  --sjb-fondo:#eef1f5;--sjb-texto:#1f2937;--sjb-borde:#e4e8ef;--sjb-sombra:0 14px 35px rgba(34,45,70,.08)
@@ -46,12 +46,16 @@ input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shado
 @media(max-width:640px){header{padding:20px 16px!important}.sjb-topnav{padding:0 10px}.sjb-topnav a{font-size:.8rem;padding:8px 10px}.card{border-radius:17px!important}}
 
 </style></head><body>
-<header><b>ASISTENCIA-QR SJB</b><div>Carnés / Emisión QR · v14.36 · RESTORE TEST</div></header>
+<header><b>ASISTENCIA-QR SJB</b><div>Carnés / Emisión QR · v14.37 · RESTORE TEST</div></header>
 <nav class="sjb-topnav">
-<a href="./">⌂ Lector</a>
-<a href="./rondas.html?v=14.36">✓ Rondas</a>
-<a href="./avisos.html?v=14.36">✉ Avisos</a>
-<a href="./carnets.html?v=14.36">▦ Carnés / QR</a>
+<a data-module="reader" href="./">⌂ Lector</a>
+<a data-module="rounds" href="./rondas.html?v=14.37">✓ Rondas</a>
+<a data-module="movements" href="./movimientos.html?v=14.37">↔ Movimientos</a>
+<a data-module="schedules" href="./horarios.html?v=14.37">◷ Horarios</a>
+<a data-module="reconciliation" href="./reconciliacion.html?v=14.37">✓ Reconciliación</a>
+<a data-module="notifications" href="./avisos.html?v=14.37">✉ Avisos</a>
+<a data-module="qr_cards" href="./carnets.html?v=14.37">▦ Carnés / QR</a>
+<a data-admin="1" href="./modulos.html?v=14.37">⚙ Módulos</a>
 </nav>
 <main>
 <div class="card no-print"><h3>1 · Sesión</h3><div class="row"><input id="email" type="email" value="imagen.institucional@cegnesanjuanbautista.edu.pe"><input id="password" type="password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div><p id="auth" class="muted"></p></div>
@@ -98,4 +102,22 @@ $('login').onclick=async()=>{try{const d=await parse(await fetch(PROJECT_URL+'/a
 $('logout').onclick=()=>{clear();location.reload()};$('search').onclick=searchStudents;$('selectAll').onclick=()=>{document.querySelectorAll('.sel').forEach(x=>{x.checked=true;state.selected.add(x.closest('.student').dataset.id)})};$('issueSelected').onclick=issueSelected;$('print').onclick=()=>window.print();$('clearPreview').onclick=()=>{$('cards').innerHTML='';$('previewCard').classList.add('hidden')};
 $('level').onchange=()=>{renderGradeOptions();searchStudents()};$('grade').onchange=()=>{renderSectionOptions();searchStudents()};$('section').onchange=()=>searchStudents();$('q').oninput=()=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchStudents(true),250)};
 if(state.access||state.refresh){refresh().then(async ok=>{if(ok){$('auth').textContent='Sesión activa';$('searchCard').classList.remove('hidden');await loadCatalog()}})}
-</script></body></html>
+</script><script>
+(async function(){
+ try{
+  const token=localStorage.getItem('sjb_access'); if(!token)return;
+  const r=await fetch('https://tqzmggopevyzxgxijgzi.supabase.co/rest/v1/rpc/attendance_my_modules',{
+   method:'POST',headers:{apikey:'sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa',Authorization:'Bearer '+token,'Content-Type':'application/json'},body:'{}'
+  });
+  if(!r.ok)return;
+  const d=await r.json(),mods=d.modules||[];
+  document.querySelectorAll('[data-module]').forEach(a=>{const m=mods.find(x=>x.code===a.dataset.module);a.style.display=m&&m.allowed?'inline-flex':'none'});
+  document.querySelectorAll('[data-admin]').forEach(a=>a.style.display=['administrator','norms_discipline'].includes(d.role)?'inline-flex':'none');
+  const current=mods.find(x=>x.code==='qr_cards');
+  if(current && !current.allowed){
+    document.querySelectorAll('main').forEach(x=>x.innerHTML='<div class="card"><h3>ACCESO NO ASIGNADO</h3><p>Este módulo no está habilitado para tu rol o usuario.</p><a class="btn" href="./">VOLVER</a></div>');
+  }
+ }catch(e){}
+})();
+</script>
+</body></html>
