@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>ASISTENCIA-QR SJB · Rondas v14.28</title>
+<title>ASISTENCIA-QR SJB · Rondas v14.36</title>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}
 *{box-sizing:border-box}body{margin:0}header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}
@@ -21,10 +21,44 @@ button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;cursor:point
 .section-card,.student,.exception{border:1px solid #e2e8f0;border-radius:13px;padding:12px;background:#f8fafc}
 .student{margin:8px 0}.student b{display:block;margin-bottom:5px}.student .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
 .student .actions button{font-size:.86rem;padding:8px 9px}.exception{margin:8px 0}.hidden{display:none!important}
+
+/* CONECTA SAN JUAN · línea gráfica unificada v14.36 */
+:root{
+ --sjb-guinda:#6f1d3b;--sjb-guinda2:#8a294f;--sjb-azul:#28476f;--sjb-crema:#fff8ea;
+ --sjb-fondo:#eef1f5;--sjb-texto:#1f2937;--sjb-borde:#e4e8ef;--sjb-sombra:0 14px 35px rgba(34,45,70,.08)
+}
+body{background:
+ radial-gradient(circle at 10% 0%,rgba(111,29,59,.08),transparent 28%),
+ radial-gradient(circle at 92% 8%,rgba(40,71,111,.10),transparent 30%),var(--sjb-fondo);color:var(--sjb-texto)}
+header{position:relative;overflow:hidden;padding:24px 20px!important;background:linear-gradient(120deg,var(--sjb-guinda),#54213a 50%,var(--sjb-azul))!important;box-shadow:0 10px 30px rgba(43,34,61,.18)}
+header:after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;right:-75px;top:-120px;background:rgba(255,255,255,.07)}
+header .big,header>b{font-size:1.28rem;letter-spacing:.02em}
+.sjb-topnav{max-width:1100px;margin:14px auto 0;padding:0 14px;display:flex;gap:8px;flex-wrap:wrap}
+.sjb-topnav a{display:inline-flex;align-items:center;gap:6px;padding:9px 12px;border-radius:999px;text-decoration:none;background:rgba(255,255,255,.86);border:1px solid rgba(111,29,59,.10);color:#344054;font-weight:800;font-size:.88rem;box-shadow:0 4px 14px rgba(31,41,55,.05)}
+.sjb-topnav a:hover{background:#fff}
+main{max-width:1100px!important}
+.card{border:1px solid rgba(255,255,255,.65)!important;border-radius:20px!important;box-shadow:var(--sjb-sombra)!important;background:rgba(255,255,255,.94)!important;backdrop-filter:blur(8px)}
+.card h3{margin-top:0;color:#28384f;font-size:1rem;letter-spacing:.01em}
+button,a.btn{border-radius:12px!important;box-shadow:0 5px 14px rgba(40,71,111,.10);transition:transform .15s ease,box-shadow .15s ease}
+button:hover,a.btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(40,71,111,.14)}
+input,select,textarea{border-radius:12px!important;border:1px solid #d8dee8!important;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#8b5a6e!important;box-shadow:0 0 0 3px rgba(111,29,59,.08)}
+.tag{border:1px solid rgba(0,0,0,.04)}
+.student,.section-card,.exception,.tpl{border-radius:16px!important;background:linear-gradient(180deg,#fff,#f8fafc)!important;border:1px solid var(--sjb-borde)!important}
+.sjb-section-label{font-size:.72rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#8a294f;margin-bottom:4px}
+.sjb-subtitle{opacity:.9;font-size:.92rem;margin-top:3px}
+@media(max-width:640px){header{padding:20px 16px!important}.sjb-topnav{padding:0 10px}.sjb-topnav a{font-size:.8rem;padding:8px 10px}.card{border-radius:17px!important}}
+
 </style>
 </head>
 <body>
-<header><div class="big">ASISTENCIA-QR SJB</div><div>Rondas de permanencia · v14.28 · RESTORE TEST</div></header>
+<header><div class="big">ASISTENCIA-QR SJB</div><div>Rondas de permanencia · v14.36 · RESTORE TEST</div></header>
+<nav class="sjb-topnav">
+<a href="./">⌂ Lector</a>
+<a href="./rondas.html?v=14.36">✓ Rondas</a>
+<a href="./avisos.html?v=14.36">✉ Avisos</a>
+<a href="./carnets.html?v=14.36">▦ Carnés / QR</a>
+</nav>
 <main>
 <div class="card">
 <h3>1 · Sesión</h3>
