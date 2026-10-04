@@ -1,8 +1,14 @@
-const CACHE='sjb-reader-v14.28';
-const SHELL=['./','./index.html','./manifest.webmanifest','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html','./rondas.html','./activar.html','./activar-personal.html','./movimientos.html','./horarios.html'];
+const CACHE='sjb-reader-v14.38';
+const SHELL=['./','./index.html?v=14.38','./manifest.webmanifest?v=14.38','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html?v=14.38','./rondas.html?v=14.38','./activar.html','./activar-personal.html','./movimientos.html?v=14.38','./horarios.html?v=14.38','./avisos.html?v=14.38','./carnets.html?v=14.38','./modulos.html?v=14.38'];
+
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(c=>c.addAll(SHELL))
+      .then(()=>self.skipWaiting())
+  );
 });
+
 self.addEventListener('activate',event=>{
   event.waitUntil(
     caches.keys()
@@ -10,6 +16,11 @@ self.addEventListener('activate',event=>{
       .then(()=>self.clients.claim())
   );
 });
+
+self.addEventListener('message',event=>{
+  if(event.data&&event.data.type==='SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch',event=>{
   const req=event.request;
   if(req.method!=='GET')return;
@@ -28,22 +39,21 @@ self.addEventListener('fetch',event=>{
           return r;
         })
         .catch(async()=>{
-          return (await caches.match(req)) || (await caches.match('./index.html'));
+          return (await caches.match(req)) || (await caches.match('./index.html?v=14.38')) || (await caches.match('./index.html'));
         })
     );
     return;
   }
 
   event.respondWith(
-    caches.match(req).then(cached=>{
-      const fresh=fetch(req).then(r=>{
+    fetch(req,{cache:'no-store'})
+      .then(r=>{
         if(r&&r.ok){
           const copy=r.clone();
           caches.open(CACHE).then(c=>c.put(req,copy));
         }
         return r;
-      }).catch(()=>cached);
-      return cached||fresh;
-    })
+      })
+      .catch(()=>caches.match(req))
   );
 });
