@@ -1,5 +1,21 @@
-const CACHE='sjb-reader-v14.49';
-const SHELL=['./','./index.html?v=14.38','./manifest.webmanifest?v=14.38','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html?v=14.38','./rondas.html?v=14.38','./activar.html','./activar-personal.html','./movimientos.html?v=14.38','./horarios.html?v=14.38','./avisos.html?v=14.38','./carnets.html?v=14.38','./modulos.html?v=14.38'];
+const CACHE='sjb-reader-v14.50';
+const SHELL=[
+'./?v=14.50',
+'./index.html?v=14.50',
+'./manifest.webmanifest?v=14.50',
+'./jsQR-1.4.0.js',
+'./icon.svg',
+'./reset.html?v=14.50',
+'./reconciliacion.html?v=14.50',
+'./rondas.html?v=14.50',
+'./activar.html?v=14.50',
+'./activar-personal.html?v=14.50',
+'./movimientos.html?v=14.50',
+'./horarios.html?v=14.50',
+'./avisos.html?v=14.50',
+'./carnets.html?v=14.50',
+'./modulos.html?v=14.50'
+];
 
 self.addEventListener('install',event=>{
   event.waitUntil(
@@ -39,7 +55,7 @@ self.addEventListener('fetch',event=>{
           return r;
         })
         .catch(async()=>{
-          return (await caches.match(req)) || (await caches.match('./index.html?v=14.38')) || (await caches.match('./index.html'));
+          return (await caches.match(req)) || (await caches.match('./index.html?v=14.50')) || (await caches.match('./index.html'));
         })
     );
     return;
