@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#6d1f3b"><title>ASISTENCIA-QR SJB · Avisos v14.33</title>
+<style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#172033;background:#eef2f6}*{box-sizing:border-box}body{margin:0}
+header{padding:18px;background:linear-gradient(135deg,#6d1f3b,#243f68);color:#fff}main{max-width:980px;margin:auto;padding:14px}
+.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.tpl{border:1px solid #dbe3ec;border-radius:14px;padding:13px;background:#f8fafc}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input,select,textarea,button,a.btn{font:inherit;border-radius:10px;padding:10px}
+input,select,textarea{border:1px solid #cbd5e1;background:#fff}textarea{width:100%;min-height:130px;resize:vertical}
+button,a.btn{border:0;background:#243f68;color:#fff;font-weight:800;text-decoration:none;cursor:pointer}.alt{background:#6d1f3b}.soft{background:#e8edf5;color:#172033}
+.tag{display:inline-block;padding:7px 10px;border-radius:999px;font-weight:800}.green{background:#dcfce7;color:#166534}.yellow{background:#fef3c7;color:#92400e}.red{background:#fee2e2;color:#991b1b}
+.preview{white-space:pre-wrap;background:#fff;border:1px dashed #94a3b8;border-radius:10px;padding:10px;margin-top:9px}.muted{color:#64748b}.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header><b>ASISTENCIA-QR SJB</b><div>Configuración de Avisos · v14.33 · RESTORE TEST</div></header>
+<main>
+<div class="card"><h3>1 · Sesión</h3>
+<div class="row"><input id="email" type="email" value="imagen.institucional@cegnesanjuanbautista.edu.pe" placeholder="Correo institucional"><input id="password" type="password" placeholder="Contraseña"><button id="login">INGRESAR</button><button id="logout" class="soft">CERRAR SESIÓN</button></div>
+<p><span id="auth" class="tag yellow">COMPROBANDO…</span></p><p id="who" class="muted"></p>
+</div>
+<div id="configCard" class="card hidden"><h3>2 · Plantillas editables</h3>
+<p class="muted">La automatización permanece activa. Aquí solo cambias textos, canal, minutos y si cada aviso es automático.</p>
+<div id="templates" class="grid"></div></div>
+<div class="card"><div class="row"><a class="btn" href="./">VOLVER AL LECTOR</a><a class="btn" href="./rondas.html?v=14.33">RONDAS</a></div><pre id="diag"></pre></div>
+</main>
+<script>
+const PROJECT_URL='https://tqzmggopevyzxgxijgzi.supabase.co',KEY='sb_publishable_uUlMuJ7qEFXBKWBCeTju8A_f4aSzesa',$=id=>document.getElementById(id);
+const state={access:localStorage.getItem('sjb_access')||'',refresh:localStorage.getItem('sjb_refresh')||'',expires:Number(localStorage.getItem('sjb_expires')||0),data:null};
+function save(d){state.access=d.access_token||'';state.refresh=d.refresh_token||state.refresh;state.expires=Date.now()+((d.expires_in||3600)*1000);localStorage.setItem('sjb_access',state.access);localStorage.setItem('sjb_refresh',state.refresh);localStorage.setItem('sjb_expires',String(state.expires))}
+function clear(){['sjb_access','sjb_refresh','sjb_expires'].forEach(k=>localStorage.removeItem(k));state.access='';state.refresh='';state.expires=0}
+async function parse(r){const t=await r.text();let d={};try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.message||d.error||d.raw||('HTTP '+r.status));return d}
+async function refresh(){if(state.access&&Date.now()<state.expires-60000)return true;if(!state.refresh)return false;try{const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})}));save(d);return true}catch{return false}}
+async function rpc(name,body={}){if(!(await refresh()))throw new Error('SESIÓN_REQUERIDA');return parse(await fetch(PROJECT_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+state.access,'Content-Type':'application/json'},body:JSON.stringify(body)}))}
+function esc(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function sample(t){let x=t.message_template;const vals={ESTUDIANTE:'María Pérez Quispe',HORA:'07:56',GRADO:'3° Primaria',SECCION:'A',SEDE:'Sede Grau',ESTADO:'Puntual',MOTIVO:'Atención médica',RESPONSABLE:'Apoderado',HORA_LIMITE:'08:30'};for(const[k,v]of Object.entries(vals))x=x.replaceAll('{'+k+'}',v);return x}
+function render(){
+ const a=state.data.templates||[];
+ $('templates').innerHTML=a.map(t=>`<div class="tpl" data-key="${esc(t.template_key)}"><h4>${esc(t.display_name)}</h4>
+ <div class="row"><label><input class="enabled" type="checkbox" ${t.enabled?'checked':''}> Activo</label><label><input class="automatic" type="checkbox" ${t.automatic?'checked':''}> Automático</label></div>
+ <div class="row"><label>Canal <select class="channel"><option value="whatsapp" ${t.channel==='whatsapp'?'selected':''}>WhatsApp</option><option value="sms" ${t.channel==='sms'?'selected':''}>SMS</option><option value="internal" ${t.channel==='internal'?'selected':''}>Interno</option></select></label>
+ <label>Minutos <input class="delay" type="number" min="0" max="240" value="${Number(t.delay_minutes||0)}" style="width:90px"></label></div>
+ <p class="muted">Variables: ${esc((t.variables||[]).map(v=>'{'+v+'}').join(' · '))}</p>
+ <textarea class="message">${esc(t.message_template)}</textarea>
+ <div class="row"><button class="previewBtn soft">VISTA PREVIA</button><button class="saveBtn alt">GUARDAR</button></div>
+ <div class="preview">${esc(sample(t))}</div></div>`).join('');
+ document.querySelectorAll('.tpl').forEach(card=>{
+   const msg=card.querySelector('.message'),pv=card.querySelector('.preview');
+   card.querySelector('.previewBtn').onclick=()=>{const t={message_template:msg.value};pv.textContent=sample(t)};
+   card.querySelector('.saveBtn').onclick=async()=>{try{
+     const b=card.querySelector('.saveBtn');b.disabled=true;
+     const r=await rpc('attendance_notification_template_update',{
+       p_template_key:card.dataset.key,p_enabled:card.querySelector('.enabled').checked,
+       p_automatic:card.querySelector('.automatic').checked,p_channel:card.querySelector('.channel').value,
+       p_delay_minutes:Number(card.querySelector('.delay').value||0),p_message_template:msg.value
+     });
+     alert('Guardado correctamente: '+r.display_name);await load()
+   }catch(e){alert('No se pudo guardar: '+e.message)}finally{card.querySelector('.saveBtn').disabled=false}}
+ })
+}
+async function load(){try{const r=await rpc('attendance_notification_templates_list');state.data=r;$('auth').className='tag green';$('auth').textContent='SESIÓN ACTIVA';$('who').textContent=(r.operator_name||'')+' · '+(r.operator_role||'');$('configCard').classList.remove('hidden');render()}catch(e){$('auth').className='tag red';$('auth').textContent='SIN ACCESO';$('who').textContent=e.message;$('diag').textContent=e.message}}
+$('login').onclick=async()=>{try{const d=await parse(await fetch(PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})}));save(d);$('password').value='';await load()}catch(e){$('auth').className='tag red';$('auth').textContent='ERROR';$('diag').textContent=e.message}};
+$('logout').onclick=()=>{clear();location.reload()};if(state.access||state.refresh)load();else{$('auth').textContent='INICIA SESIÓN'}
+</script></body></html>
