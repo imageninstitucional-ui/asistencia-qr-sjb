@@ -1,4 +1,4 @@
-const CACHE='sjb-reader-v14.45';
+const CACHE='sjb-reader-v14.46';
 const SHELL=['./','./index.html?v=14.38','./manifest.webmanifest?v=14.38','./jsQR-1.4.0.js','./icon.svg','./reset.html','./reconciliacion.html?v=14.38','./rondas.html?v=14.38','./activar.html','./activar-personal.html','./movimientos.html?v=14.38','./horarios.html?v=14.38','./avisos.html?v=14.38','./carnets.html?v=14.38','./modulos.html?v=14.38'];
 
 self.addEventListener('install',event=>{
