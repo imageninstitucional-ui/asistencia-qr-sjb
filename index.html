@@ -574,8 +574,10 @@ $('camera').onclick=startCamera;$('stopCamera').onclick=stopCamera;
  net();await chooseEngine();await updateQueue();
  if('serviceWorker'in navigator){
   try{
-   await navigator.serviceWorker.register('./sw.js',{scope:'./'});
-   $('pwaState').className='tag good';$('pwaState').textContent='PWA LISTA'
+   const reg=await navigator.serviceWorker.register('./sw.js?v=14.38',{scope:'./',updateViaCache:'none'});
+   await reg.update();
+   if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
+   $('pwaState').className='tag good';$('pwaState').textContent='PWA v14.38 LISTA'
   }catch(e){$('pwaState').className='tag warn';$('pwaState').textContent='PWA PENDIENTE'}
  }else{$('pwaState').className='tag warn';$('pwaState').textContent='SIN PWA'}
  if(navigator.onLine){
