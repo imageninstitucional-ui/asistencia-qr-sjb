@@ -1,4 +1,4 @@
-const CACHE='sjb-reader-v14.53';
+const CACHE='sjb-reader-v14.54';
 const SHELL=[
 './?v=14.50',
 './index.html?v=14.50',
