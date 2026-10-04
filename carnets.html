@@ -112,7 +112,7 @@ if(state.access||state.refresh){refresh().then(async ok=>{if(ok){$('auth').textC
   if(!r.ok)return;
   const d=await r.json(),mods=d.modules||[];
   document.querySelectorAll('[data-module]').forEach(a=>{const m=mods.find(x=>x.code===a.dataset.module);a.style.display=m&&m.allowed?'inline-flex':'none'});
-  document.querySelectorAll('[data-admin]').forEach(a=>a.style.display=['administrator','norms_discipline'].includes(d.role)?'inline-flex':'none');
+  document.querySelectorAll('[data-admin]').forEach(a=>a.style.display=d.role==='administrator'?'inline-flex':'none');
   const current=mods.find(x=>x.code==='qr_cards');
   if(current && !current.allowed){
     document.querySelectorAll('main').forEach(x=>x.innerHTML='<div class="card"><h3>ACCESO NO ASIGNADO</h3><p>Este módulo no está habilitado para tu rol o usuario.</p><a class="btn" href="./">VOLVER</a></div>');
